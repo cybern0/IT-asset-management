@@ -35,6 +35,7 @@ export type Ctx = {
   label: (table: string, id: string) => string;
   find: (table: string, id: string) => Row | undefined;
   rows: (table: string) => Row[];
+  t?: (s: string, vars?: Record<string, string | number>) => string;
 };
 
 export type Entity = {
@@ -261,26 +262,45 @@ const consommables: Entity[] = [
   }),
 ];
 
+const TYPE_LICENCE = optsL({ SANS_LICENCE: "Sans licence", PERPETUELLE: "Perpétuelle", ABONNEMENT: "Abonnement" });
+
 const logiciels: Entity[] = [
   ent({
-    key: "software", label: "Software", singular: "un logiciel", local: true,
-    titleFields: ["name"], subtitleFields: ["version"],
+    key: "software", label: "Software", singular: "un logiciel", table: "logiciel",
+    titleFields: ["nom", "version"], subtitleFields: ["editeur"], badgeField: "type_licence",
     fields: [
-      text("name", "Nom", { required: true }), text("publisher", "Éditeur"), text("version", "Version"),
-      pick("category", "Catégorie", ["Bureautique", "Système", "Sécurité", "Métier", "Autre"]),
-      area("notes", "Notes"),
+      text("nom", "Nom", { required: true }),
+      text("editeur", "Éditeur"),
+      text("version", "Version"),
+      pick("type_licence", "Type de licence", TYPE_LICENCE, { required: true, default: "PERPETUELLE" }),
+      area("observations", "Observations"),
+      created(),
     ],
-    seed: [{ name: "Microsoft Office", publisher: "Microsoft", version: "2021", category: "Bureautique" }],
+    validate: (d, { rows, selfId }) =>
+      rows.some((r) => r.id !== selfId && (r.nom ?? "").toLowerCase() === (d.nom ?? "").trim().toLowerCase()
+        && (r.version ?? "").toLowerCase() === (d.version ?? "").trim().toLowerCase())
+        ? { nom: "Ce logiciel existe déjà avec cette version." } : ({} as Record<string, string>),
+    seed: [
+      { id: "sw1", nom: "Microsoft Office", editeur: "Microsoft", version: "2021", type_licence: "PERPETUELLE" },
+      { id: "sw2", nom: "LibreOffice", editeur: "The Document Foundation", version: "24.8", type_licence: "SANS_LICENCE" },
+    ],
   }),
   ent({
-    key: "licenses", label: "Licenses", singular: "une licence", local: true,
-    titleFields: ["software"], subtitleFields: ["seats"], badgeField: "state",
+    key: "licenses", label: "Licenses", singular: "une licence", table: "licence",
+    titleFields: ["logiciel_id"], subtitleFields: ["date_expiration"],
+    badgeFn: (r) => (r.date_expiration && r.date_expiration < new Date().toISOString().slice(0, 10) ? "Expirée" : "Active"),
     fields: [
-      text("software", "Logiciel", { required: true }),
-      pick("kind", "Type de licence", ["Libre", "Perpétuelle", "Abonnement"]),
-      text("key", "Clé de licence"), num("seats", "Nombre de postes"), date("expires", "Expiration"),
-      pick("state", "État", ["Active", "Expirée"], { required: true }),
+      ref("logiciel_id", "Logiciel", "logiciel", { required: true }),
+      text("cle_licence", "Clé de licence"),
+      num("nombre_postes", "Nombre de postes", { required: true, gt: 0, default: "1" }),
+      date("date_expiration", "Date d’expiration"),
+      area("observations", "Observations"),
+      created(),
     ],
+    validate: (d, { ctx }) =>
+      ctx.find("logiciel", d.logiciel_id)?.type_licence === "SANS_LICENCE"
+        ? { logiciel_id: "Ce logiciel est sans licence : aucune licence à enregistrer." } : ({} as Record<string, string>),
+    seed: [{ logiciel_id: "sw1", cle_licence: "XXXXX-XXXXX-XXXXX", nombre_postes: "10" }],
   }),
 ];
 
@@ -420,13 +440,28 @@ const suivi: Entity[] = [
     ],
   }),
   ent({
-    key: "logs", label: "Logs", singular: "une entrée de journal", local: true,
-    titleFields: ["object"], subtitleFields: ["user"], badgeField: "action",
+    key: "logs", label: "Logs", singular: "une entrée de journal", table: "journal_audit",
+    titleFields: ["action"], subtitleFields: ["table_cible", "identifiant_cible"],
     fields: [
-      date("when", "Date"), text("user", "Utilisateur"),
-      pick("action", "Action", ["Création", "Modification", "Suppression", "Connexion"], { required: true }),
-      text("object", "Objet", { required: true }), area("details", "Détails"),
+      text("action", "Action", { required: true, placeholder: "ex. AFFECTATION_CREEE" }),
+      ref("utilisateur_id", "Utilisateur", "utilisateur"),
+      text("table_cible", "Table concernée"),
+      num("identifiant_cible", "Identifiant concerné", { min: 0 }),
+      area("details", "Détails (JSON)", { placeholder: '{"cle": "valeur"}' }),
+      text("adresse_ip", "Adresse IP", { placeholder: "10.0.0.5" }),
+      created(),
     ],
+    validate: (d) => {
+      const e: Record<string, string> = {};
+      const det = (d.details ?? "").trim();
+      if (det) { try { JSON.parse(det); } catch { e.details = "JSON invalide."; } }
+      const ip = (d.adresse_ip ?? "").trim();
+      const v4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}(\/\d{1,2})?$/;
+      const v6 = /^[0-9a-f:]*:[0-9a-f:.]*(\/\d{1,3})?$/i;
+      if (ip && !v4.test(ip) && !v6.test(ip)) e.adresse_ip = "Adresse IP invalide.";
+      return e;
+    },
+    seed: [{ action: "CONNEXION", utilisateur_id: "u1", table_cible: "utilisateur", identifiant_cible: "1", adresse_ip: "10.0.0.5", details: '{"succes": true}' }],
   }),
 ];
 
@@ -494,6 +529,7 @@ export const tableLabel: Record<string, (r: Row) => string> = {
   categorie_materiel: (r) => r.libelle,
   materiel: (r) => (r.code_inventaire ? `${r.designation} (${r.code_inventaire})` : r.designation),
   article_consommable: (r) => `${r.designation} (${r.reference})`,
+  logiciel: (r) => (r.version ? `${r.nom} ${r.version}` : r.nom),
 };
 
 /* ---------- affichage ---------- */
@@ -508,9 +544,10 @@ export function rowsFor(entity: Entity, rows: Record<string, Row[]>): Row[] {
 }
 
 export function showValue(f: Field, value: string | undefined, ctx: Ctx): string {
+  const tr = ctx.t ?? ((s: string) => s);
   if (!value) return "";
-  if (f.type === "ref" && f.ref) return ctx.label(f.ref, value) || "(supprimé)";
-  if (f.type === "select") return f.options?.find((o) => o.v === value)?.l ?? value;
+  if (f.type === "ref" && f.ref) return ctx.label(f.ref, value) || tr("(supprimé)");
+  if (f.type === "select") return tr(f.options?.find((o) => o.v === value)?.l ?? value);
   if (f.type === "multiref" && f.ref) {
     const table = f.ref;
     return value.split(",").filter((id) => id && ctx.find(table, id)).map((id) => ctx.label(table, id)).join(", ");
@@ -519,19 +556,25 @@ export function showValue(f: Field, value: string | undefined, ctx: Ctx): string
   return value;
 }
 
-export function viewOf(entity: Entity, row: Row, ctx: Ctx): { title: string; sub: string; badge: string } {
-  const get = (names?: string[]) =>
+export function viewOf(
+  entity: Entity, row: Row, ctx: Ctx,
+): { title: string; sub: string; badge: string; tone: "ok" | "warn" | "bad" | "neutral" } {
+  const raw: Ctx = { ...ctx, t: undefined }; // valeurs françaises d'origine, pour la couleur du badge
+  const get = (names: string[] | undefined, c: Ctx) =>
     (names ?? [])
       .map((n) => {
         const f = entity.fields.find((x) => x.name === n);
-        return f ? showValue(f, row[n], ctx) : (row[n] ?? "");
+        return f ? showValue(f, row[n], c) : (row[n] ?? "");
       })
       .filter(Boolean)
       .join(" · ");
+  const tr = ctx.t ?? ((s: string) => s);
+  const badgeRaw = entity.badgeFn ? entity.badgeFn(row, raw) : entity.badgeField ? get([entity.badgeField], raw) : "";
   return {
-    title: get(entity.titleFields) || "Sans nom",
-    sub: get(entity.subtitleFields),
-    badge: entity.badgeFn ? entity.badgeFn(row, ctx) : entity.badgeField ? get([entity.badgeField]) : "",
+    title: get(entity.titleFields, ctx) || tr("Sans nom"),
+    sub: get(entity.subtitleFields, ctx),
+    badge: badgeRaw ? tr(badgeRaw) : "",
+    tone: tone(badgeRaw),
   };
 }
 

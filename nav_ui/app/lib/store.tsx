@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useReducer, type ReactNode } from "react";
+import { useI18n } from "./i18n";
 import { allEntities, tableLabel, type Ctx, type Row } from "./schema";
 
 export type { Row };
@@ -43,11 +44,13 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [rows, dispatch] = useReducer(reducer, undefined, init);
+  const { t } = useI18n();
 
   const value = useMemo<Store>(() => {
     const find = (table: string, id: string) => rows[table]?.find((r) => r.id === id);
     const ctx: Ctx = {
       find,
+      t,
       rows: (table) => rows[table] ?? [],
       label: (table, id) => {
         const r = find(table, id);
@@ -77,13 +80,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
         }
         if (total > 0) {
-          return `Suppression impossible : cet élément est utilisé par ${total} enregistrement(s) (${used.join(", ")}).`;
+          return t("Suppression impossible : cet élément est utilisé par {n} enregistrement(s) ({tables}).", { n: total, tables: used.join(", ") });
         }
         dispatch({ type: "remove", table, id });
         return null;
       },
     };
-  }, [rows]);
+  }, [rows, t]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

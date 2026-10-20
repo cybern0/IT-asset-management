@@ -1,6 +1,7 @@
 import { Navigate, NavLink, useLocation, useParams } from "react-router";
 import { CrudPanel } from "../components/CrudPanel";
 import { GlobalView } from "../components/GlobalView";
+import { useI18n } from "../lib/i18n";
 import { rowsFor, sections } from "../lib/schema";
 import { useStore } from "../lib/store";
 import NotFound from "./notfound";
@@ -9,6 +10,7 @@ export default function Module() {
   const { group, tab } = useParams();
   const { pathname } = useLocation();
   const { rows } = useStore();
+  const { t } = useI18n();
 
   const section = sections.find((s) => pathname.startsWith(`/${s.slug}/`));
   const g = section?.groups.find((x) => x.slug === group);
@@ -22,9 +24,9 @@ export default function Module() {
   return (
     <>
       <header className="page-head">
-        <p className="crumb">{section.label}</p>
-        <h1>{g.label}</h1>
-        <p className="lede">{g.description}</p>
+        <p className="crumb">{t(section.label)}</p>
+        <h1>{t(g.label)}</h1>
+        <p className="lede">{t(g.description)}</p>
       </header>
 
       {g.kind === "global" ? (
@@ -32,10 +34,10 @@ export default function Module() {
       ) : (
         <>
           {g.entities.length > 1 && (
-            <nav className="tabs" aria-label={`Rubriques de ${g.label}`}>
+            <nav className="tabs" aria-label={t("Rubriques de {x}", { x: t(g.label) })}>
               {g.entities.map((e) => (
                 <NavLink key={e.key} to={`/${section.slug}/${g.slug}/${e.key}`} className="tab">
-                  {e.label}
+                  {t(e.label)}
                   <span className="count">{rowsFor(e, rows).length}</span>
                 </NavLink>
               ))}
@@ -43,7 +45,7 @@ export default function Module() {
           )}
           {entity?.local && (
             <p className="local-note">
-              Cette rubrique n’existe pas encore dans parc.sql : les champs sont provisoires.
+              {t("Cette rubrique n’existe pas encore dans parc.sql : les champs sont provisoires.")}
             </p>
           )}
           {entity && <CrudPanel key={entity.key} entity={entity} />}

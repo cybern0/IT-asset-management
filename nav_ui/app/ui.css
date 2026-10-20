@@ -236,3 +236,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .checks label { display: flex; align-items: center; gap: 8px; font-weight: 400; }
 .checks input { width: auto; }
+
+/* ---------- sélecteur de langue ---------- */
+.sidebar-foot {
+  flex: none; display: flex; gap: 4px; padding: 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.is-collapsed .sidebar-foot { flex-direction: column; align-items: center; padding: 10px 0; }
+.lang-btn {
+  min-width: 36px; padding: 5px 8px; background: none; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 6px;
+  color: var(--pine-ink); font-weight: 600; font-size: 13px;
+}
+.lang-btn:hover { background: var(--pine-hover); }
+.lang-btn[aria-pressed="true"] { background: var(--tag); border-color: var(--tag); color: var(--tag-ink); }
