@@ -1,0 +1,40 @@
+# ==========================================
+# Gestionnaire de projet (uv / Python)
+# ==========================================
+# L'environnement virtuel local créé par uv
+.venv/
+.rocks/
+
+# Cache des outils de linting et de typage (Ruff, Mypy)
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# ==========================================
+# Fichiers compilés et caches Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==========================================
+# Variables d'environnement et secrets
+# ==========================================
+# Contient vos mots de passe de base de données, clés d'API, etc.
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# Système d'exploitation et Éditeurs
+# ==========================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ==========================================
+# Base de données locale (si vous utilisez SQLite pour les tests)
+# ==========================================
+*.db
+*.sqlite3
