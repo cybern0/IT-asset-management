@@ -1,4 +1,4 @@
-# main.py
+# Initialise FastAPI et déclare les routes
 from fastapi import FastAPI
 
 app = FastAPI()
