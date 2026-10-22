@@ -16,7 +16,7 @@ export function GlobalView() {
   const items = (rows.materiel ?? [])
     .map((r) => {
       const v = viewOf(entity, r, ctx);
-      const tab = categoryTab[r.categorie_id];
+      const tab = categoryTab[r.categorie_code];
       return {
         id: r.id,
         type: ctx.label("categorie_materiel", r.categorie_id) || t("Sans catégorie"),

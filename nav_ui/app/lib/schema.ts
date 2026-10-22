@@ -29,6 +29,7 @@ export type Field = {
   default?: string; // "today" accepté
   placeholder?: string;
   hint?: string;
+  api?: string; // nom du champ dans le JSON de l'API, s'il differe
 };
 
 export type Ctx = {
@@ -43,7 +44,12 @@ export type Entity = {
   label: string; // libellé de l'onglet
   singular: string; // « un ordinateur » (bouton +)
   table: string;
-  where?: { field: string; value: string; negate?: boolean };
+  /** Filtre d'onglet. `via` : la valeur filtree est un code ; a la creation on pre-remplit
+   *  `setField` avec l'id de la ligne de `table` dont `key` vaut ce code. */
+  where?: {
+    field: string; value: string; negate?: boolean;
+    via?: { table: string; key: string; setField: string };
+  };
   titleFields: string[];
   subtitleFields?: string[];
   badgeField?: string;
@@ -51,6 +57,8 @@ export type Entity = {
   fields: Field[];
   seed?: Record<string, string>[];
   local?: boolean;
+  readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
+  immutable?: boolean; // creation seulement (ex. mouvements de stock)
   validate?: (
     draft: Record<string, string>,
     env: { rows: Row[]; selfId: string | null; ctx: Ctx },
@@ -116,7 +124,10 @@ function materielTab(
 ): Entity {
   return ent({
     key, label, singular, table: "materiel",
-    where: { field: "categorie_id", value: categorieId },
+    where: {
+      field: "categorie_code", value: categorieId,
+      via: { table: "categorie_materiel", key: "code", setField: "categorie_id" },
+    },
     titleFields: ["designation"], subtitleFields: ["code_inventaire"], badgeField: "statut",
     fields: [
       text("code_inventaire", "Code d’inventaire", { required: true, unique: true }),
@@ -245,7 +256,7 @@ const consommables: Entity[] = [
         ? { article_id: "Un stock existe déjà pour cet article et ce service." } : ({} as Record<string, string>),
   }),
   ent({
-    key: "mouvements", label: "Mouvements", singular: "un mouvement", table: "mouvement_consommable",
+    key: "mouvements", label: "Mouvements", singular: "un mouvement", table: "mouvement_consommable", immutable: true,
     titleFields: ["article_id"], subtitleFields: ["type_mouvement", "quantite"],
     fields: [
       ref("article_id", "Article", "article_consommable", { required: true }),
@@ -348,7 +359,7 @@ const acces: Entity[] = [
       ref("agent_id", "Agent", "agent"),
       text("nom_utilisateur", "Nom d’utilisateur", { required: true, unique: true }),
       pass("mot_de_passe_hash", "Mot de passe", {
-        required: true, placeholder: "Laisser vide pour ne pas le changer",
+        api: "mot_de_passe", required: true, placeholder: "Laisser vide pour ne pas le changer",
         hint: "Le serveur stockera uniquement son hash.",
       }),
       ref("role_id", "Rôle", "role", { required: true }),
@@ -364,7 +375,7 @@ const acces: Entity[] = [
     fields: [
       text("code", "Code", { required: true, unique: true }),
       text("libelle", "Libellé", { required: true }),
-      multiref("permissions", "Permissions", "permission"),
+      multiref("permissions", "Permissions", "permission", { api: "permission_ids" }),
     ],
     seed: [
       { id: "ADMIN", code: "ADMIN", libelle: "Administrateur", permissions: "materiel:lire,materiel:modifier,affectation:creer,stock:gerer,utilisateur:gerer" },
@@ -440,7 +451,7 @@ const suivi: Entity[] = [
     ],
   }),
   ent({
-    key: "logs", label: "Logs", singular: "une entrée de journal", table: "journal_audit",
+    key: "logs", label: "Logs", singular: "une entrée de journal", table: "journal_audit", readOnly: true,
     titleFields: ["action"], subtitleFields: ["table_cible", "identifiant_cible"],
     fields: [
       text("action", "Action", { required: true, placeholder: "ex. AFFECTATION_CREEE" }),
@@ -588,3 +599,38 @@ export function tone(value: string): "ok" | "warn" | "bad" | "neutral" {
   if (BAD.includes(value)) return "bad";
   return "neutral";
 }
+
+/* ---------- liaison avec l'API (crud_api) ---------- */
+/** table SQL -> segment d'URL sous VITE_API_URL. Les tables absentes d'ici restent locales (en memoire). */
+export const tableEndpoint: Record<string, string> = {
+  direction: "directions",
+  service: "services",
+  agent: "agents",
+  utilisateur: "utilisateurs",
+  role: "roles",
+  permission: "permissions",
+  categorie_materiel: "categories-materiel",
+  materiel: "materiels",
+  affectation: "affectations",
+  article_consommable: "articles-consommables",
+  stock_consommable: "stocks",
+  mouvement_consommable: "mouvements",
+  logiciel: "logiciels",
+  licence: "licences",
+  journal_audit: "journal-audit",
+};
+
+export const isRemote = (table: string): boolean => table in tableEndpoint;
+
+/** Champs d'une table (les onglets d'une meme table partagent la meme liste de champs). */
+export function fieldsOfTable(table: string): Field[] {
+  return allEntities.find((e) => e.table === table)?.fields ?? [];
+}
+
+/** Apres une ecriture sur la cle, ces tables sont rechargees (effets de bord cote serveur). */
+export const refreshAfter: Record<string, string[]> = {
+  affectation: ["materiel"], // statut du materiel
+  mouvement_consommable: ["stock_consommable"],
+  permission: ["role"],
+  categorie_materiel: ["materiel"],
+};

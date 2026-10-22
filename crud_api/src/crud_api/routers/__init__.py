@@ -1,0 +1,49 @@
+from fastapi import APIRouter, Depends
+
+from crud_api.core.deps import get_current_user
+from crud_api.routers import audit, auth
+from crud_api.routers.crud import crud_router
+from crud_api.schemas import consommable as c
+from crud_api.schemas import logiciel as lg
+from crud_api.schemas import materiel as m
+from crud_api.schemas import organisation as o
+from crud_api.schemas import user as u
+from crud_api.services.consommable_service import article_service, mouvement_service, stock_service
+from crud_api.services.logiciel_service import licence_service, logiciel_service
+from crud_api.services.materiel_service import affectation_service, categorie_service, materiel_service
+from crud_api.services.organisation_service import agent_service, direction_service, service_service
+from crud_api.services.role_service import permission_service, role_service
+from crud_api.services.user_service import user_service
+
+# Authentification : /auth/login est public
+auth_router = auth.router
+
+# Toutes les autres routes passent par get_current_user (ouvert tant que AUTH_ENABLED=false)
+api_router = APIRouter(dependencies=[Depends(get_current_user)])
+
+_resources = [
+    # (prefixe, tag, service, schema creation, schema modification, schema sortie, immuable)
+    ("/directions", "Directions", direction_service, o.DirectionCreate, o.DirectionUpdate, o.DirectionOut, False),
+    ("/services", "Services", service_service, o.ServiceCreate, o.ServiceUpdate, o.ServiceOut, False),
+    ("/agents", "Agents", agent_service, o.AgentCreate, o.AgentUpdate, o.AgentOut, False),
+    ("/utilisateurs", "Utilisateurs", user_service, u.UserCreate, u.UserUpdate, u.UserOut, False),
+    ("/roles", "Rôles", role_service, u.RoleCreate, u.RoleUpdate, u.RoleOut, False),
+    ("/permissions", "Permissions", permission_service, u.PermissionCreate, u.PermissionUpdate, u.PermissionOut, False),
+    ("/categories-materiel", "Catégories de matériel", categorie_service, m.CategorieCreate, m.CategorieUpdate, m.CategorieOut, False),
+    ("/materiels", "Matériel", materiel_service, m.MaterielCreate, m.MaterielUpdate, m.MaterielOut, False),
+    ("/affectations", "Affectations", affectation_service, m.AffectationCreate, m.AffectationUpdate, m.AffectationOut, False),
+    ("/articles-consommables", "Articles consommables", article_service, c.ArticleCreate, c.ArticleUpdate, c.ArticleOut, False),
+    ("/stocks", "Stocks", stock_service, c.StockCreate, c.StockUpdate, c.StockOut, False),
+    ("/mouvements", "Mouvements de stock", mouvement_service, c.MouvementCreate, c.MouvementCreate, c.MouvementOut, True),
+    ("/logiciels", "Logiciels", logiciel_service, lg.LogicielCreate, lg.LogicielUpdate, lg.LogicielOut, False),
+    ("/licences", "Licences", licence_service, lg.LicenceCreate, lg.LicenceUpdate, lg.LicenceOut, False),
+]
+
+for prefix, tag, service, create, update, out, immutable in _resources:
+    api_router.include_router(
+        crud_router(service=service, create_schema=create, update_schema=update, out_schema=out, immutable=immutable),
+        prefix=prefix,
+        tags=[tag],
+    )
+
+api_router.include_router(audit.router, prefix="/journal-audit", tags=["Journal d'audit"])

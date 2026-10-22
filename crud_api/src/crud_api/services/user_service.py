@@ -1,2 +1,87 @@
-# TOUTE la logique métier et accès aux données services/
-# Fonctions pour créer, chercher, modifier un utilisateur
+# TOUTE la logique metier et acces aux donnees des utilisateurs
+import logging
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from crud_api.core.errors import ConflictError, UnauthorizedError
+from crud_api.core.security import hash_password, verify_password
+from crud_api.models import Role, Utilisateur
+from crud_api.schemas.user import UserCreate
+from crud_api.services import audit_service
+from crud_api.services.base import CRUDService
+
+logger = logging.getLogger(__name__)
+
+# Hash factice : on verifie toujours un mot de passe, meme si le compte n'existe pas
+_DUMMY_HASH = hash_password("mot-de-passe-factice")
+
+
+class UserService(CRUDService[Utilisateur]):
+    model = Utilisateur
+    label = "Utilisateur"
+
+    async def _is_active_admin(self, db: AsyncSession, user: Utilisateur) -> bool:
+        if not user.actif:
+            return False
+        code = await db.scalar(select(Role.code).where(Role.id == user.role_id))
+        return code == "ADMIN"
+
+    async def _ensure_other_admin(self, db: AsyncSession, user: Utilisateur) -> None:
+        """Il doit toujours rester un administrateur actif."""
+        if not await self._is_active_admin(db, user):
+            return
+        others = await db.scalar(
+            select(func.count())
+            .select_from(Utilisateur)
+            .join(Role, Role.id == Utilisateur.role_id)
+            .where(Role.code == "ADMIN", Utilisateur.actif.is_(True), Utilisateur.id != user.id)
+        )
+        if not others:
+            raise ConflictError("Impossible : il doit rester au moins un administrateur actif.")
+
+    async def prepare_create(self, db: AsyncSession, values: dict[str, Any]) -> dict[str, Any]:
+        values["mot_de_passe_hash"] = hash_password(values.pop("mot_de_passe"))
+        return values
+
+    async def prepare_update(self, db: AsyncSession, obj: Utilisateur, values: dict[str, Any]) -> dict[str, Any]:
+        password = values.pop("mot_de_passe", None)
+        if password:
+            values["mot_de_passe_hash"] = hash_password(password)
+        if values.get("actif") is False or ("role_id" in values and values["role_id"] != obj.role_id):
+            await self._ensure_other_admin(db, obj)
+        return values
+
+    async def before_delete(self, db: AsyncSession, obj: Utilisateur) -> None:
+        await self._ensure_other_admin(db, obj)
+
+    async def authenticate(self, db: AsyncSession, nom_utilisateur: str, mot_de_passe: str) -> Utilisateur:
+        user = (
+            await db.scalars(select(Utilisateur).where(Utilisateur.nom_utilisateur == nom_utilisateur))
+        ).first()
+        valid = verify_password(mot_de_passe, user.mot_de_passe_hash if user else _DUMMY_HASH)
+        if user is None or not valid or not user.actif:
+            raise UnauthorizedError("Identifiants invalides.")
+        user.derniere_connexion = datetime.now(UTC)
+        db.info["actor_id"] = user.id
+        await audit_service.record(db, "LOGIN", "utilisateur", user.id)
+        await db.commit()
+        return user
+
+    async def bootstrap_admin(self, db: AsyncSession, password: str) -> None:
+        """Cree le compte `admin` si la table est vide (utile quand l'authentification est activee)."""
+        if await db.scalar(select(func.count()).select_from(Utilisateur)):
+            return
+        role_id = await db.scalar(select(Role.id).where(Role.code == "ADMIN"))
+        if role_id is None:
+            logger.warning("Role ADMIN introuvable : compte admin non cree (voir parc.sql).")
+            return
+        await self.create(
+            db, UserCreate(nom_utilisateur="admin", mot_de_passe=password, role_id=role_id)
+        )
+        logger.info("Compte `admin` cree.")
+
+
+user_service = UserService()

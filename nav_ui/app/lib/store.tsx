@@ -1,21 +1,32 @@
-import { createContext, useContext, useMemo, useReducer, type ReactNode } from "react";
+import {
+  createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode,
+} from "react";
+import { api, ApiError } from "./api";
 import { useI18n } from "./i18n";
-import { allEntities, tableLabel, type Ctx, type Row } from "./schema";
+import { fromApi, toApi } from "./mapping";
+import {
+  allEntities, fieldsOfTable, isRemote, refreshAfter, tableEndpoint, tableLabel, type Ctx, type Row,
+} from "./schema";
 
 export type { Row };
 type State = Record<string, Row[]>;
 type Action =
+  | { type: "set"; table: string; rows: Row[] }
   | { type: "save"; table: string; row: Row }
   | { type: "remove"; table: string; id: string };
 
-/** Les lignes sont rangées par table SQL ; plusieurs onglets peuvent partager une table. */
+export type Status = "loading" | "ready" | "error";
+
+const remoteTables = Object.keys(tableEndpoint);
+
+/** Tables absentes de l'API (rubriques provisoires) : donnees d'exemple en memoire. */
 function init(): State {
   const state: State = {};
   for (const e of allEntities) {
     state[e.table] ??= [];
-    const preset = e.where && !e.where.negate ? { [e.where.field]: e.where.value } : {};
+    if (isRemote(e.table)) continue; // les autres viennent de l'API
     (e.seed ?? []).forEach((v, i) => {
-      state[e.table].push({ ...preset, ...v, id: v.id ?? `${e.key}-seed-${i}` });
+      state[e.table].push({ ...v, id: v.id ?? `${e.key}-seed-${i}` });
     });
   }
   return state;
@@ -23,6 +34,7 @@ function init(): State {
 
 function reducer(state: State, action: Action): State {
   const list = state[action.table] ?? [];
+  if (action.type === "set") return { ...state, [action.table]: action.rows };
   if (action.type === "remove") {
     return { ...state, [action.table]: list.filter((r) => r.id !== action.id) };
   }
@@ -34,9 +46,12 @@ function reducer(state: State, action: Action): State {
 type Store = {
   rows: State;
   ctx: Ctx;
-  save: (table: string, values: Record<string, string>, id?: string) => Row;
-  /** Retourne un message d'erreur si la suppression est refusée (clé étrangère), sinon null. */
-  remove: (table: string, id: string) => string | null;
+  status: Status;
+  reload: () => Promise<void>;
+  /** Cree (sans id) ou modifie (avec id). Leve ApiError si l'API refuse. */
+  save: (table: string, values: Record<string, string>, id?: string) => Promise<Row>;
+  /** Retourne un message si la suppression est refusee (ex. element utilise ailleurs), sinon null. */
+  remove: (table: string, id: string) => Promise<string | null>;
 };
 
 const StoreCtx = createContext<Store | null>(null);
@@ -44,7 +59,29 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [rows, dispatch] = useReducer(reducer, undefined, init);
+  const [status, setStatus] = useState<Status>("loading");
   const { t } = useI18n();
+
+  /** Recharge des tables depuis l'API. Retourne le nombre d'echecs. */
+  const loadTables = useCallback(async (tables: string[]): Promise<number> => {
+    const results = await Promise.allSettled(
+      tables.map(async (table) => {
+        const data = await api.list(tableEndpoint[table]);
+        const fields = fieldsOfTable(table);
+        dispatch({ type: "set", table, rows: data.map((j) => fromApi(fields, j)) });
+      }),
+    );
+    return results.filter((r) => r.status === "rejected").length;
+  }, []);
+
+  const reload = useCallback(async () => {
+    setStatus("loading");
+    setStatus((await loadTables(remoteTables)) > 0 ? "error" : "ready");
+  }, [loadTables]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const value = useMemo<Store>(() => {
     const find = (table: string, id: string) => rows[table]?.find((r) => r.id === id);
@@ -57,36 +94,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return r ? (tableLabel[table]?.(r) ?? r.id) : "";
       },
     };
+    const refresh = (table: string) => {
+      // effets de bord cote serveur + nouvelle ligne du journal d'audit
+      void loadTables([...(refreshAfter[table] ?? []), "journal_audit"]);
+    };
+
     return {
       rows,
       ctx,
-      save(table, values, id) {
-        const row: Row = { ...values, id: id ?? newId() };
+      status,
+      reload,
+      async save(table, values, id) {
+        if (!isRemote(table)) {
+          const row: Row = { ...values, id: id ?? newId() };
+          dispatch({ type: "save", table, row });
+          return row;
+        }
+        const fields = fieldsOfTable(table);
+        const body = toApi(fields, values);
+        const json = id
+          ? await api.update(tableEndpoint[table], id, body)
+          : await api.create(tableEndpoint[table], body);
+        const row = fromApi(fields, json);
         dispatch({ type: "save", table, row });
+        refresh(table);
         return row;
       },
-      remove(table, id) {
-        // équivalent de ON DELETE RESTRICT sur les clés étrangères
-        const seen = new Set<string>();
-        const used: string[] = [];
-        let total = 0;
-        for (const e of allEntities) {
-          for (const f of e.fields) {
-            const k = `${e.table}.${f.name}`;
-            if (f.type !== "ref" || f.ref !== table || seen.has(k)) continue;
-            seen.add(k);
-            const n = (rows[e.table] ?? []).filter((r) => r[f.name] === id).length;
-            if (n > 0) { total += n; used.push(e.table); }
+      async remove(table, id) {
+        if (isRemote(table)) {
+          try {
+            await api.remove(tableEndpoint[table], id);
+          } catch (err) {
+            if (err instanceof ApiError && err.status >= 400 && err.status < 500) return err.message;
+            throw err;
           }
-        }
-        if (total > 0) {
-          return t("Suppression impossible : cet élément est utilisé par {n} enregistrement(s) ({tables}).", { n: total, tables: used.join(", ") });
+          refresh(table);
         }
         dispatch({ type: "remove", table, id });
         return null;
       },
     };
-  }, [rows, t]);
+  }, [rows, status, t, reload, loadTables]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

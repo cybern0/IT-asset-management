@@ -250,3 +250,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .lang-btn:hover { background: var(--pine-hover); }
 .lang-btn[aria-pressed="true"] { background: var(--tag); border-color: var(--tag); color: var(--tag-ink); }
+
+/* ---------- etat de l'API ---------- */
+.api-loading { flex: none; color: var(--muted); font-size: 14px; }
+.api-banner {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px; background: var(--bad-bg); color: var(--bad-ink);
+  border-left: 3px solid var(--danger); border-radius: 0 6px 6px 0; font-size: 14px;
+}
+fieldset.fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.view-only { padding: 0 14px 12px; }
+.field input:disabled, .field select:disabled, .field textarea:disabled { background: transparent; color: var(--ink); opacity: 0.85; }

@@ -1,21 +1,27 @@
 import { useState, type FormEvent, type ReactNode } from "react";
+import { ApiError } from "../lib/api";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
+import { uiFieldErrors } from "../lib/mapping";
 import { matches, showValue, viewOf, type Entity, type Field, type Row } from "../lib/schema";
 import { useStore } from "../lib/store";
 
-const MASK = "••••••••";
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function CrudPanel({ entity }: { entity: Entity }) {
   const { rows, save, remove, ctx } = useStore();
   const { t } = useI18n();
-  const addLabel = t("Ajouter {x}", { x: t(entity.singular) });
   const tableRows = rows[entity.table] ?? [];
   const list = tableRows.filter((r) => matches(entity, r));
-  // le champ filtré par l'onglet (ex. categorie_id) est pré-rempli et masqué
-  const hiddenName = entity.where && !entity.where.negate ? entity.where.field : null;
+  const addLabel = t("Ajouter {x}", { x: t(entity.singular) });
+
+  // le champ filtre par l'onglet (ex. categorie_id) est pre-rempli et masque
+  const w = entity.where;
+  const hiddenName = w && !w.negate ? (w.via?.setField ?? w.field) : null;
   const shown = entity.fields.filter((f) => f.name !== hiddenName);
+
+  const canCreate = !entity.readOnly;
+  const canEdit = !entity.readOnly && !entity.immutable;
 
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null); // id | "new" | null
@@ -23,12 +29,12 @@ export function CrudPanel({ entity }: { entity: Entity }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState("");
-  const [deleteError, setDeleteError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const q = query.trim().toLowerCase();
   const visible = q
-    ? list.filter((r) =>
-        shown.some((f) => showValue(f, r[f.name], ctx).toLowerCase().includes(q)))
+    ? list.filter((r) => shown.some((f) => showValue(f, r[f.name], ctx).toLowerCase().includes(q)))
     : list;
 
   function blank(): Record<string, string> {
@@ -39,7 +45,14 @@ export function CrudPanel({ entity }: { entity: Entity }) {
       if (!d && f.type === "select" && f.required && f.options) d = f.options[0].v;
       v[f.name] = d;
     }
-    if (entity.where && !entity.where.negate) v[entity.where.field] = entity.where.value;
+    if (w && !w.negate) {
+      if (w.via) {
+        const via = w.via;
+        v[via.setField] = ctx.rows(via.table).find((r) => r[via.key] === w.value)?.id ?? "";
+      } else {
+        v[w.field] = w.value;
+      }
+    }
     return v;
   }
 
@@ -54,19 +67,40 @@ export function CrudPanel({ entity }: { entity: Entity }) {
     setDraft(values);
     setErrors({});
     setConfirming(false);
-    setDeleteError("");
+    setFormError("");
     setNotice(message);
   }
 
   const open = (row: Row) => reset(row.id, draftFrom(row));
   const startNew = () => reset("new", blank());
 
-  function submit(e: FormEvent) {
+  /** Erreur renvoyee par l'API : par champ quand c'est possible, sinon message general. */
+  function showApiError(err: unknown) {
+    if (!(err instanceof ApiError)) {
+      setFormError(t("Erreur inattendue."));
+      return;
+    }
+    if (err.network) {
+      setFormError(t("Impossible de joindre l’API."));
+      return;
+    }
+    const byField = uiFieldErrors(shown, err.fieldErrors);
+    setErrors(byField);
+    if (Object.keys(byField).length === 0) setFormError(err.message);
+  }
+
+  async function submit(e: FormEvent) {
     e.preventDefault();
+    if (busy || (selected !== "new" && !canEdit)) return;
     const creating = selected === "new";
     const selfId = creating ? null : selected;
     const errs: Record<string, string> = {};
+    setFormError("");
 
+    if (hiddenName && w && !draft[hiddenName]) {
+      setFormError(t("Catégorie introuvable : {code}", { code: w.value }));
+      return;
+    }
     for (const f of shown) {
       if (f.readonly) continue;
       const v = (draft[f.name] ?? "").trim();
@@ -85,29 +119,39 @@ export function CrudPanel({ entity }: { entity: Entity }) {
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
-    const values: Record<string, string> = { ...draft };
-    for (const f of entity.fields) {
-      if (f.type !== "password") continue;
-      const typed = (draft[f.name] ?? "").trim();
-      values[f.name] = typed ? MASK : creating ? "" : (tableRows.find((r) => r.id === selfId)?.[f.name] ?? "");
+    setBusy(true);
+    try {
+      const row = await save(entity.table, draft, selfId ?? undefined);
+      reset(row.id, draftFrom(row), creating ? "Élément créé." : "Modifications enregistrées.");
+    } catch (err) {
+      showApiError(err);
+    } finally {
+      setBusy(false);
     }
-    const row = save(entity.table, values, creating ? undefined : (selfId ?? undefined));
-    reset(row.id, draftFrom(row), creating ? "Élément créé." : "Modifications enregistrées.");
   }
 
-  function destroy() {
+  async function destroy() {
     if (!confirming) return setConfirming(true);
-    if (!selected || selected === "new") return;
-    const err = remove(entity.table, selected);
-    if (err) {
+    if (!selected || selected === "new" || busy) return;
+    setBusy(true);
+    try {
+      const refused = await remove(entity.table, selected);
+      if (refused) {
+        setConfirming(false);
+        setFormError(refused);
+      } else {
+        reset(null, {});
+      }
+    } catch (err) {
       setConfirming(false);
-      setDeleteError(err);
-      return;
+      showApiError(err);
+    } finally {
+      setBusy(false);
     }
-    reset(null, {});
   }
 
   const isNew = selected === "new";
+  const viewOnly = !isNew && !canEdit;
   const heading = isNew ? t("Nouvel élément") : viewOf(entity, { ...draft, id: selected ?? "" }, ctx).title;
 
   function control(f: Field, i: number): ReactNode {
@@ -166,7 +210,10 @@ export function CrudPanel({ entity }: { entity: Entity }) {
       );
     }
     if (f.type === "textarea") {
-      return <textarea id={id} rows={3} value={value} placeholder={f.placeholder ? t(f.placeholder) : undefined} onChange={(e) => set(e.target.value)} {...aria} />;
+      return (
+        <textarea id={id} rows={3} value={value} placeholder={f.placeholder ? t(f.placeholder) : undefined}
+          onChange={(e) => set(e.target.value)} {...aria} />
+      );
     }
     return (
       <input
@@ -185,10 +232,11 @@ export function CrudPanel({ entity }: { entity: Entity }) {
       <section className="pane" aria-label={t("Liste : {x}", { x: t(entity.label) })}>
         <div className="pane-head">
           <h2>{t(entity.label)} <span className="count">{list.length}</span></h2>
-          <button type="button" className="add-btn" onClick={startNew}
-            aria-label={addLabel} title={addLabel}>
-            <Icon name="plus" />
-          </button>
+          {canCreate && (
+            <button type="button" className="add-btn" onClick={startNew} aria-label={addLabel} title={addLabel}>
+              <Icon name="plus" />
+            </button>
+          )}
         </div>
         <label className="search">
           <Icon name="search" size={16} />
@@ -198,9 +246,11 @@ export function CrudPanel({ entity }: { entity: Entity }) {
         <div className="pane-body">
           {visible.length === 0 ? (
             <p className="empty">
-              {list.length === 0
-                ? t("Aucun élément pour l’instant. Utilisez le bouton + pour ajouter {x}.", { x: t(entity.singular) })
-                : t("Aucun résultat pour ce filtre.")}
+              {list.length > 0
+                ? t("Aucun résultat pour ce filtre.")
+                : canCreate
+                  ? t("Aucun élément pour l’instant. Utilisez le bouton + pour ajouter {x}.", { x: t(entity.singular) })
+                  : t("Aucun élément pour l’instant.")}
             </p>
           ) : (
             <ul className="items">
@@ -227,7 +277,11 @@ export function CrudPanel({ entity }: { entity: Entity }) {
       <section className="pane" aria-label={t("Détail")}>
         {selected === null ? (
           <div className="pane-body">
-            <p className="empty">{t("Sélectionnez un élément dans la liste, ou cliquez sur + pour en créer un.")}</p>
+            <p className="empty">
+              {t(canCreate
+                ? "Sélectionnez un élément dans la liste, ou cliquez sur + pour en créer un."
+                : "Sélectionnez un élément dans la liste.")}
+            </p>
           </div>
         ) : (
           <form key={selected} className="form" onSubmit={submit} noValidate>
@@ -236,37 +290,44 @@ export function CrudPanel({ entity }: { entity: Entity }) {
               <button type="button" className="btn ghost" onClick={() => reset(null, {})}>{t("Fermer")}</button>
             </div>
             <div className="pane-body">
-              <div className="grid">
-                {shown.map((f, i) => {
-                  const id = `${entity.key}-${f.name}`;
-                  const wide = f.type === "textarea" || f.type === "multiref";
-                  return (
-                    <div key={f.name} className={`field${wide ? " wide" : ""}`}>
-                      {f.type === "multiref" ? (
-                        <span className="lbl" id={`${id}-lbl`}>{t(f.label)}</span>
-                      ) : (
-                        <label htmlFor={id}>
-                          {t(f.label)}
-                          {f.required && !f.readonly && <span className="req"> *</span>}
-                        </label>
-                      )}
-                      {control(f, i)}
-                      {f.hint && !errors[f.name] && <p className="hint">{t(f.hint)}</p>}
-                      {errors[f.name] && <p className="error" id={`${id}-err`}>{t(errors[f.name])}</p>}
-                    </div>
-                  );
-                })}
-              </div>
+              {viewOnly && <p className="hint view-only">{t("Cet élément ne peut plus être modifié.")}</p>}
+              <fieldset className="fieldset" disabled={viewOnly || busy}>
+                <div className="grid">
+                  {shown.map((f, i) => {
+                    const id = `${entity.key}-${f.name}`;
+                    const wide = f.type === "textarea" || f.type === "multiref";
+                    return (
+                      <div key={f.name} className={`field${wide ? " wide" : ""}`}>
+                        {f.type === "multiref" ? (
+                          <span className="lbl" id={`${id}-lbl`}>{t(f.label)}</span>
+                        ) : (
+                          <label htmlFor={id}>
+                            {t(f.label)}
+                            {f.required && !f.readonly && !viewOnly && <span className="req"> *</span>}
+                          </label>
+                        )}
+                        {control(f, i)}
+                        {f.hint && !errors[f.name] && !viewOnly && <p className="hint">{t(f.hint)}</p>}
+                        {errors[f.name] && <p className="error" id={`${id}-err`}>{t(errors[f.name])}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </fieldset>
             </div>
             <div className="form-foot">
-              <button type="submit" className="btn primary">{t(isNew ? "Créer" : "Enregistrer les modifications")}</button>
-              {!isNew && (
-                <button type="button" className={`btn ${confirming ? "danger" : "ghost"}`} onClick={destroy}>
+              {!viewOnly && (
+                <button type="submit" className="btn primary" disabled={busy}>
+                  {busy ? t("Enregistrement…") : t(isNew ? "Créer" : "Enregistrer les modifications")}
+                </button>
+              )}
+              {!isNew && canEdit && (
+                <button type="button" className={`btn ${confirming ? "danger" : "ghost"}`} onClick={() => void destroy()} disabled={busy}>
                   {t(confirming ? "Confirmer la suppression" : "Supprimer")}
                 </button>
               )}
               <span className="notice" role="status">{notice ? t(notice) : ""}</span>
-              {deleteError && <p className="error foot-error" role="alert">{deleteError}</p>}
+              {formError && <p className="error foot-error" role="alert">{formError}</p>}
             </div>
           </form>
         )}
