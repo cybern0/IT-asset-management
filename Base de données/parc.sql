@@ -66,12 +66,6 @@ CREATE TABLE IF NOT EXISTS utilisateur (
     cree_le TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO role(code, libelle) VALUES -- Roles initiaux
- ('ADMIN', 'Administrateur'),
- ('GESTIONNAIRE', 'Gestionnaire du parc - Affectation seule'),
- ('LECTURE', 'Consultation seule')
-ON CONFLICT (code) DO NOTHING;
-
 -- Affectation et Materiels individualises
 
 CREATE TABLE IF NOT EXISTS categorie_materiel (
