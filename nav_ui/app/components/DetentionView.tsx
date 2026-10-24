@@ -5,6 +5,7 @@ import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
 import { tone } from "../lib/schema";
 import { FicheActions } from "./FicheActions";
+import { Lightbox } from "./Lightbox";
 import { Modal } from "./Modal";
 
 const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -116,6 +117,7 @@ export function DetentionView() {
 function DetentionDetail({ d, onChange }: { d: Detention; onChange: (f: Detention) => void }) {
   const { t } = useI18n();
   const [src, setSrc] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(false);
 
   useEffect(() => {
     if (!d.materiel_a_image) { setSrc(null); return; }
@@ -140,7 +142,14 @@ function DetentionDetail({ d, onChange }: { d: Detention; onChange: (f: Detentio
       <div className="detail-grid">
         <section>
           <h3>{t("Matériel")}</h3>
-          {src && <img className="thumb" src={src} alt={d.materiel_designation} />}
+          {src && (
+            <button type="button" className="thumb-btn" onClick={() => setZoom(true)} title={t("Cliquer pour agrandir")} aria-label={t("Cliquer pour agrandir")}>
+              <img className="thumb" src={src} alt={d.materiel_designation} />
+            </button>
+          )}
+          {zoom && src && (
+            <Lightbox src={src} alt={d.materiel_designation} newTabHref={`/image/${d.materiel_id}`} onClose={() => setZoom(false)} />
+          )}
           <dl>
             {row("Désignation", d.materiel_designation)}
             {row("Code d’inventaire", d.materiel_code)}

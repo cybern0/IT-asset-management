@@ -331,6 +331,8 @@ const A: [string, string, string][] = [
   ["Sera enregistrée avec le matériel : {x}", "Will be saved with the item: {x}", "Horaketina miaraka amin'ny fitaovana: {x}"],
   ["Annuler le choix", "Clear selection", "Foano ny safidy"],
   ["Agrandir / supprimer", "Enlarge / delete", "Hohamafisina / hofafana"],
+  ["Cliquer pour agrandir", "Click to enlarge", "Tsindrio hanamafisana"],
+  ["Ouvrir dans un nouvel onglet", "Open in a new tab", "Sokafy amin'ny tabilao vaovao"],
 ];
 
 // [anglais (clé), français, malgache] : noms de rubriques écrits en anglais dans le code

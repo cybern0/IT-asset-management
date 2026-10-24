@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { Lightbox } from "./Lightbox";
 
 const MAX_MB = 5;
 
@@ -15,6 +16,7 @@ export function ImageField({ materielId, hasImage, file, onFile, onError, onMana
 }) {
   const { t } = useI18n();
   const [src, setSrc] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(false);
 
   useEffect(() => {
     let url: string | null = null;
@@ -42,9 +44,18 @@ export function ImageField({ materielId, hasImage, file, onFile, onError, onMana
 
   return (
     <div className="image-field">
-      <div className="image-preview">
-        {src ? <img src={src} alt={t("Image")} /> : <span className="hint">{t("Aucune image")}</span>}
-      </div>
+      {src ? (
+        <button type="button" className="image-preview zoomable" onClick={() => setZoom(true)}
+          title={t("Cliquer pour agrandir")} aria-label={t("Cliquer pour agrandir")}>
+          <img src={src} alt={t("Image")} />
+        </button>
+      ) : (
+        <div className="image-preview"><span className="hint">{t("Aucune image")}</span></div>
+      )}
+      {zoom && src && (
+        <Lightbox src={src} alt={t("Image")} onClose={() => setZoom(false)}
+          newTabHref={!file && materielId ? `/image/${materielId}` : undefined} />
+      )}
       <div className="image-field-side">
         <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={t("Image")}
           onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />

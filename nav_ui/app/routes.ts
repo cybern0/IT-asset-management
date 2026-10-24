@@ -1,6 +1,7 @@
 import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
 export default [
+  route("image/:id", "routes/image.tsx"),
   layout("routes/shell.tsx", [
     index("routes/home.tsx"),
     route("assets/:group/:tab?", "routes/module.tsx", { id: "assets" }),
