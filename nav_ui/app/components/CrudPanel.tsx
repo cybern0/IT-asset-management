@@ -1,6 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { FicheBar } from "./FicheBar";
 import { ImageDialog } from "./ImageDialog";
+import { ImageField } from "./ImageField";
+import { api } from "../lib/api";
 import { ApiError } from "../lib/api";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
@@ -34,6 +36,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
 
   const q = query.trim().toLowerCase();
   const visible = q
@@ -72,6 +75,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
     setConfirming(false);
     setFormError("");
     setNotice(message);
+    setPendingImage(null);
   }
 
   const open = (row: Row) => reset(row.id, draftFrom(row));
@@ -125,7 +129,22 @@ export function CrudPanel({ entity }: { entity: Entity }) {
     setBusy(true);
     try {
       const row = await save(entity.table, draft, selfId ?? undefined);
-      reset(row.id, draftFrom(row), creating ? "Élément créé." : "Modifications enregistrées.");
+      let message = creating ? "Élément créé." : "Modifications enregistrées.";
+      let saved = row;
+      if (pendingImage && entity.extras?.includes("image")) {
+        try {
+          const form = new FormData();
+          form.append("file", pendingImage);
+          await api.upload(`/materiels/${row.id}/image`, form);
+          await refresh(["materiel", "journal_audit"]);
+          saved = { ...row, a_image: "true" };
+        } catch (imgErr) {
+          reset(row.id, draftFrom(row), message);
+          showApiError(imgErr);
+          return;
+        }
+      }
+      reset(saved.id, draftFrom(saved), message);
     } catch (err) {
       showApiError(err);
     } finally {
@@ -319,6 +338,19 @@ export function CrudPanel({ entity }: { entity: Entity }) {
                       </div>
                     );
                   })}
+                  {entity.extras?.includes("image") && (
+                    <div className="field wide">
+                      <span className="lbl">{t("Image")}</span>
+                      <ImageField
+                        materielId={isNew ? null : selected}
+                        hasImage={hasImage}
+                        file={pendingImage}
+                        onFile={setPendingImage}
+                        onError={setFormError}
+                        onManage={() => setImageOpen(true)}
+                      />
+                    </div>
+                  )}
                 </div>
               </fieldset>
             </div>
@@ -331,11 +363,6 @@ export function CrudPanel({ entity }: { entity: Entity }) {
               {!isNew && canEdit && (
                 <button type="button" className={`btn ${confirming ? "danger" : "ghost"}`} onClick={() => void destroy()} disabled={busy}>
                   {t(confirming ? "Confirmer la suppression" : "Supprimer")}
-                </button>
-              )}
-              {!isNew && selected && entity.extras?.includes("image") && (
-                <button type="button" className="btn ghost" onClick={() => setImageOpen(true)} disabled={busy}>
-                  {t(hasImage ? "Voir l’image" : "Ajouter une image")}
                 </button>
               )}
               <span className="notice" role="status">{notice ? t(notice) : ""}</span>

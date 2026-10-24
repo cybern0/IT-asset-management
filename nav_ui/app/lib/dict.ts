@@ -325,6 +325,12 @@ const A: [string, string, string][] = [
   ["Voir", "View", "Hijery"],
   ["Nom et prénom", "Full name", "Anarana sy fanampiny"],
   ["Email", "Email", "Mailaka"],
+  ["Image", "Image", "Sary"],
+  ["Aucune image", "No image", "Tsy misy sary"],
+  ["Format non accepté (JPEG, PNG ou WebP).", "Format not accepted (JPEG, PNG or WebP).", "Tsy ekena ny endrika (JPEG, PNG na WebP)."],
+  ["Sera enregistrée avec le matériel : {x}", "Will be saved with the item: {x}", "Horaketina miaraka amin'ny fitaovana: {x}"],
+  ["Annuler le choix", "Clear selection", "Foano ny safidy"],
+  ["Agrandir / supprimer", "Enlarge / delete", "Hohamafisina / hofafana"],
 ];
 
 // [anglais (clé), français, malgache] : noms de rubriques écrits en anglais dans le code
