@@ -1,4 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
+import { FicheBar } from "./FicheBar";
+import { ImageDialog } from "./ImageDialog";
 import { ApiError } from "../lib/api";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
@@ -9,7 +11,7 @@ import { useStore } from "../lib/store";
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function CrudPanel({ entity }: { entity: Entity }) {
-  const { rows, save, remove, ctx } = useStore();
+  const { rows, save, remove, refresh, ctx } = useStore();
   const { t } = useI18n();
   const tableRows = rows[entity.table] ?? [];
   const list = tableRows.filter((r) => matches(entity, r));
@@ -31,6 +33,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
   const [notice, setNotice] = useState("");
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
 
   const q = query.trim().toLowerCase();
   const visible = q
@@ -151,6 +154,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
   }
 
   const isNew = selected === "new";
+  const hasImage = tableRows.find((r) => r.id === selected)?.a_image === "true";
   const viewOnly = !isNew && !canEdit;
   const heading = isNew ? t("Nouvel élément") : viewOf(entity, { ...draft, id: selected ?? "" }, ctx).title;
 
@@ -290,6 +294,9 @@ export function CrudPanel({ entity }: { entity: Entity }) {
               <button type="button" className="btn ghost" onClick={() => reset(null, {})}>{t("Fermer")}</button>
             </div>
             <div className="pane-body">
+              {!isNew && selected && entity.extras?.includes("fiche") && (
+                <FicheBar affectationId={selected} version={`${draft.date_retour ?? ""}|${draft.agent_id ?? ""}`} />
+              )}
               {viewOnly && <p className="hint view-only">{t("Cet élément ne peut plus être modifié.")}</p>}
               <fieldset className="fieldset" disabled={viewOnly || busy}>
                 <div className="grid">
@@ -326,12 +333,28 @@ export function CrudPanel({ entity }: { entity: Entity }) {
                   {t(confirming ? "Confirmer la suppression" : "Supprimer")}
                 </button>
               )}
+              {!isNew && selected && entity.extras?.includes("image") && (
+                <button type="button" className="btn ghost" onClick={() => setImageOpen(true)} disabled={busy}>
+                  {t(hasImage ? "Voir l’image" : "Ajouter une image")}
+                </button>
+              )}
               <span className="notice" role="status">{notice ? t(notice) : ""}</span>
               {formError && <p className="error foot-error" role="alert">{formError}</p>}
             </div>
           </form>
         )}
       </section>
+      {imageOpen && selected && selected !== "new" && (
+        <ImageDialog
+          materielId={selected}
+          title={viewOf(entity, { ...draft, id: selected }, ctx).title}
+          hasImage={hasImage}
+          onClose={() => setImageOpen(false)}
+          onChanged={async () => {
+            await refresh(["materiel", "journal_audit"]);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.core.errors import ConflictError, UnprocessableError
-from crud_api.models import Affectation, Agent, CategorieMateriel, Materiel
+from crud_api.models import Affectation, Agent, CategorieMateriel, FicheDetention, Materiel
+from crud_api.services import fiche_service
 from crud_api.services.base import CRUDService
 
 # Etat du materiel au retour -> nouveau statut
@@ -129,7 +130,16 @@ class AffectationService(CRUDService[Affectation]):
                 values["etat_retour"] = self._apply_return(materiel, values.get("etat_retour"))
         return values
 
+    async def after_create(self, db: AsyncSession, obj: Affectation) -> None:
+        # chaine : affectation -> fiche de detention (NON_SIGNEE), dans la meme transaction
+        await fiche_service.ensure_for_affectation(db, obj.id)
+
     async def before_delete(self, db: AsyncSession, obj: Affectation) -> None:
+        fiche = await db.scalar(select(FicheDetention).where(FicheDetention.affectation_id == obj.id))
+        if fiche is not None and fiche.statut == "SIGNEE":
+            raise ConflictError(
+                "Cette affectation a une fiche signée (conservation 5 ans) : annulez d’abord la signature."
+            )
         if obj.date_retour is None:
             materiel = await db.get(Materiel, obj.materiel_id)
             if materiel is not None and materiel.statut == "ATTRIBUE":

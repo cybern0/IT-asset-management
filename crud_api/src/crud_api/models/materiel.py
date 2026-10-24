@@ -35,6 +35,7 @@ class Materiel(IdMixin, Base):
     localisation: Mapped[str | None] = mapped_column(String(180))
     observations: Mapped[str | None] = mapped_column(Text)
     cree_le: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    image_chemin: Mapped[str | None] = mapped_column(String(255))
 
     categorie: Mapped[CategorieMateriel] = relationship(lazy="joined")
 
@@ -42,6 +43,11 @@ class Materiel(IdMixin, Base):
     def categorie_code(self) -> str:
         """Code de la categorie : l'UI s'en sert pour filtrer ses onglets."""
         return self.categorie.code
+
+    @property
+    def a_image(self) -> bool:
+        """Le chemin du fichier reste cote serveur : l'UI ne voit que ce booleen."""
+        return bool(self.image_chemin)
 
 
 class Affectation(IdMixin, Base):

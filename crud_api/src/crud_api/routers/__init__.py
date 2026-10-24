@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from crud_api.core.deps import get_current_user
-from crud_api.routers import audit, auth
+from crud_api.routers import audit, auth, fiches
 from crud_api.routers.crud import crud_router
 from crud_api.schemas import consommable as c
 from crud_api.schemas import logiciel as lg
@@ -46,4 +46,5 @@ for prefix, tag, service, create, update, out, immutable in _resources:
         tags=[tag],
     )
 
+api_router.include_router(fiches.router)
 api_router.include_router(audit.router, prefix="/journal-audit", tags=["Journal d'audit"])

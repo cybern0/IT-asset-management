@@ -261,3 +261,40 @@ button, input, select, textarea { font: inherit; color: inherit; }
 fieldset.fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .view-only { padding: 0 14px 12px; }
 .field input:disabled, .field select:disabled, .field textarea:disabled { background: transparent; color: var(--ink); opacity: 0.85; }
+
+/* ---------- image du materiel, fiches de detention, vue Detentions ---------- */
+.modal {
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink);
+  overflow: hidden;
+}
+.modal[open] { display: flex; flex-direction: column; }
+.modal.wide { width: min(940px, calc(100vw - 32px)); }
+.modal::backdrop { background: rgba(20, 30, 28, 0.45); }
+.modal-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modal-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: grid; gap: 14px; align-content: start; }
+.modal-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.image-box { display: grid; place-items: center; min-height: 160px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.image-box img { max-width: 100%; max-height: 52dvh; object-fit: contain; border-radius: 4px; }
+
+.fiche-card { padding: 12px 14px; margin: 14px 14px 0; border: 1px solid var(--line); border-left: 3px solid var(--tag); border-radius: 0 8px 8px 0; background: #fff; display: grid; gap: 8px; }
+.fiche-card h3, .detail-grid h3 { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.fiche { display: grid; gap: 10px; }
+.fiche-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fiche-ref { font-weight: 700; }
+.fiche-sign { display: grid; gap: 10px; padding: 10px 12px; background: var(--paper); border-radius: 8px; }
+.fiche-sign label { display: grid; gap: 4px; font-weight: 600; font-size: 14px; }
+.fiche-sign input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 400; }
+
+.filters { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.filters .search { flex: 1 1 180px; margin: 0; }
+.filters select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.pad { padding: 16px; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.detail-grid section { display: grid; gap: 8px; align-content: start; }
+.detail-grid dl { margin: 0; display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 4px 12px; font-size: 14px; }
+.detail-grid dt { color: var(--muted); }
+.detail-grid dd { margin: 0; overflow-wrap: anywhere; }
+.thumb { max-width: 100%; max-height: 190px; object-fit: contain; border: 1px solid var(--line); border-radius: 6px; background: #fff; justify-self: start; }
+@media (max-width: 860px) { .detail-grid { grid-template-columns: minmax(0, 1fr); } }

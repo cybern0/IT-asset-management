@@ -30,7 +30,7 @@ export default function Module() {
       </header>
 
       {g.kind === "global" ? (
-        <GlobalView />
+        <GlobalView tab={tab} />
       ) : (
         <>
           {g.entities.length > 1 && (

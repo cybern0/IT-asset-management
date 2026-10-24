@@ -57,6 +57,8 @@ export type Entity = {
   fields: Field[];
   seed?: Record<string, string>[];
   local?: boolean;
+  /** Boutons propres a l'onglet : image du materiel, fiche de detention d'une affectation. */
+  extras?: ("image" | "fiche")[];
   readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
   immutable?: boolean; // creation seulement (ex. mouvements de stock)
   validate?: (
@@ -129,6 +131,7 @@ function materielTab(
       via: { table: "categorie_materiel", key: "code", setField: "categorie_id" },
     },
     titleFields: ["designation"], subtitleFields: ["code_inventaire"], badgeField: "statut",
+    extras: ["image"],
     fields: [
       text("code_inventaire", "Code d’inventaire", { required: true, unique: true }),
       ref("categorie_id", "Catégorie", "categorie_materiel", { required: true }),
@@ -171,6 +174,7 @@ const materiel: Entity[] = [
     key: "affectations", label: "Affectations", singular: "une affectation", table: "affectation",
     titleFields: ["materiel_id"], subtitleFields: ["agent_id"],
     badgeFn: (r) => (r.date_retour ? "Rendue" : "Active"),
+    extras: ["fiche"],
     fields: [
       ref("materiel_id", "Matériel", "materiel", { required: true }),
       ref("agent_id", "Agent", "agent", { required: true }),
@@ -498,7 +502,7 @@ export const sections: Section[] = [
       { slug: "reseau", label: "Réseau et baies", icon: "network", description: "Équipements réseau, baies, câblage, cartes SIM : même table matériel, une catégorie par onglet.", entities: reseau },
       { slug: "consommables", label: "Consommables et stocks", icon: "printer", description: "Articles, stocks par service et mouvements d’entrée, sortie et transfert.", entities: consommables },
       { slug: "logiciels", label: "Logiciels", icon: "layers", description: "Logiciels installés et licences associées.", entities: logiciels },
-      { slug: "global", label: "Global", icon: "globe", kind: "global", description: "Recherche transversale dans tout le matériel.", entities: [] },
+      { slug: "global", label: "Global", icon: "globe", kind: "global", description: "Recherche dans tout le matériel et liste croisée matériel × agent détenteur, avec fiches de détention.", entities: [] },
     ],
   },
   {
@@ -589,8 +593,8 @@ export function viewOf(
   };
 }
 
-const OK = ["Attribué", "Oui", "Active", "Envoyée", "Terminé"];
-const WARN = ["En maintenance", "En cours", "En attente", "Expirée", "Suspendue"];
+const OK = ["Attribué", "Oui", "Active", "Envoyée", "Terminé", "Signée"];
+const WARN = ["En maintenance", "En cours", "En attente", "Expirée", "Suspendue", "Non signée"];
 const BAD = ["Réformé", "Non", "Échec", "Sous le seuil", "Résiliée"];
 
 export function tone(value: string): "ok" | "warn" | "bad" | "neutral" {

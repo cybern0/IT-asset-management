@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, NavLink } from "react-router";
+import { DetentionView } from "./DetentionView";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
 import { assetEntities, categoryTab, showValue, viewOf } from "../lib/schema";
@@ -7,7 +8,20 @@ import { useStore } from "../lib/store";
 
 const entity = assetEntities.find((a) => a.entity.table === "materiel")!.entity;
 
-export function GlobalView() {
+export function GlobalView({ tab }: { tab?: string }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <nav className="tabs" aria-label={t("Global")}>
+        <NavLink to="/assets/global" end className="tab">{t("Matériel")}</NavLink>
+        <NavLink to="/assets/global/detentions" className="tab">{t("Détentions")}</NavLink>
+      </nav>
+      {tab === "detentions" ? <DetentionView /> : <MaterielSearch />}
+    </>
+  );
+}
+
+function MaterielSearch() {
   const { rows, ctx } = useStore();
   const { t } = useI18n();
   const [query, setQuery] = useState("");

@@ -45,20 +45,22 @@ function parseError(status: number, data: unknown): ApiError {
   return new ApiError(status, `Erreur ${status}`);
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+type Init = { json?: unknown; form?: FormData; timeout?: number };
+
+/** Appel HTTP commun : jeton, delai, erreurs reseau. Leve ApiError si la reponse n'est pas 2xx. */
+async function send(method: string, path: string, init: Init = {}): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), init.timeout ?? TIMEOUT_MS);
   const token = getToken();
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method,
       headers: {
-        Accept: "application/json",
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(init.json !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: init.form ?? (init.json !== undefined ? JSON.stringify(init.json) : undefined),
       signal: controller.signal,
     });
   } catch {
@@ -66,13 +68,22 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } finally {
     clearTimeout(timer);
   }
+  if (!res.ok) {
+    let data: unknown = null;
+    try { data = await res.json(); } catch { /* corps non JSON */ }
+    throw parseError(res.status, data);
+  }
+  return res;
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await send(method, path, { json: body });
   if (res.status === 204) return undefined as T;
   const text = await res.text();
-  let data: unknown = null;
-  try { data = text ? JSON.parse(text) : null; } catch { /* corps non JSON */ }
-  if (!res.ok) throw parseError(res.status, data);
-  return data as T;
+  return (text ? JSON.parse(text) : null) as T;
 }
+
+const UPLOAD_TIMEOUT_MS = 60_000;
 
 export type Json = Record<string, unknown>;
 
@@ -81,6 +92,14 @@ export const api = {
   create: (endpoint: string, body: Json) => request<Json>("POST", `/${endpoint}`, body),
   update: (endpoint: string, id: string, body: Json) => request<Json>("PATCH", `/${endpoint}/${id}`, body),
   remove: (endpoint: string, id: string) => request<void>("DELETE", `/${endpoint}/${id}`),
+  get: <T = Json>(path: string) => request<T>("GET", path),
+  post: <T = Json>(path: string) => request<T>("POST", path),
+  del: (path: string) => request<void>("DELETE", path),
+  /** Envoi de fichier (multipart) : le navigateur fixe lui-meme le Content-Type. */
+  upload: async <T = Json>(path: string, form: FormData): Promise<T> =>
+    (await send("POST", path, { form, timeout: UPLOAD_TIMEOUT_MS })).json() as Promise<T>,
+  /** Fichier binaire (image, PDF) : l'authentification passe par l'en-tete, pas par une URL. */
+  blob: async (path: string): Promise<Blob> => (await send("GET", path, { timeout: UPLOAD_TIMEOUT_MS })).blob(),
   login: (nom_utilisateur: string, mot_de_passe: string) =>
     request<{ access_token: string }>("POST", "/auth/login", { nom_utilisateur, mot_de_passe }),
 };

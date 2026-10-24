@@ -17,7 +17,8 @@ if TEST_URL:
     os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = ""
 
 SQL_DIR = Path(__file__).resolve().parents[2] / "Base de données"
-SQL_FILES = ["parc.sql", "parc_2.sql", "parc_3.sql", "parc_4.sql"]
+_first = "parc.sql" if (SQL_DIR / "parc.sql").exists() else "parc_1.sql"
+SQL_FILES = [_first, "parc_2.sql", "parc_3.sql", "parc_4.sql", "parc_5.sql"]
 
 
 def _sql(name: str) -> str:

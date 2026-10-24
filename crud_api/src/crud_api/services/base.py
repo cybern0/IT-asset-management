@@ -59,6 +59,10 @@ class CRUDService(Generic[ModelT]):
     async def prepare_update(self, db: AsyncSession, obj: ModelT, values: dict[str, Any]) -> dict[str, Any]:
         return values
 
+    async def after_create(self, db: AsyncSession, obj: ModelT) -> None:
+        """Appele apres l'insertion (id connu), dans la meme transaction."""
+        return None
+
     async def before_delete(self, db: AsyncSession, obj: ModelT) -> None:
         return None
 
@@ -84,6 +88,7 @@ class CRUDService(Generic[ModelT]):
         obj = self.model(**values)
         db.add(obj)
         await self._flush(db, "insert")
+        await self.after_create(db, obj)
         await self._audit(db, "CREATE", obj, sorted(data.model_fields_set))
         await db.commit()
         return await self.get(db, obj.id)  # type: ignore[attr-defined]

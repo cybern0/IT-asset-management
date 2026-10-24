@@ -63,6 +63,7 @@ class MaterielOut(ORMModel):
     localisation: str | None
     observations: str | None
     cree_le: datetime
+    a_image: bool = False
 
 
 class AffectationCreate(BaseModel):

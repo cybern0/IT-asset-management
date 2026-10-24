@@ -48,6 +48,8 @@ type Store = {
   ctx: Ctx;
   status: Status;
   reload: () => Promise<void>;
+  /** Recharge quelques tables depuis l'API (ex. apres un envoi d'image). */
+  refresh: (tables: string[]) => Promise<void>;
   /** Cree (sans id) ou modifie (avec id). Leve ApiError si l'API refuse. */
   save: (table: string, values: Record<string, string>, id?: string) => Promise<Row>;
   /** Retourne un message si la suppression est refusee (ex. element utilise ailleurs), sinon null. */
@@ -104,6 +106,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ctx,
       status,
       reload,
+      async refresh(tables) {
+        await loadTables(tables.filter(isRemote));
+      },
       async save(table, values, id) {
         if (!isRemote(table)) {
           const row: Row = { ...values, id: id ?? newId() };

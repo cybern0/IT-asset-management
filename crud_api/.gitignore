@@ -38,3 +38,6 @@ Thumbs.db
 # ==========================================
 *.db
 *.sqlite3
+
+# Fichiers envoyes (images du materiel, fiches signees)
+uploads/

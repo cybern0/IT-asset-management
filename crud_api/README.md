@@ -50,3 +50,12 @@ Necessitent une base PostgreSQL vide dediee (le schema `eparc` y est supprime pu
 export TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/parc_test
 uv run pytest
 ```
+
+## Images du matériel et fiches de détention
+
+Exécuter `Base de données/parc_5.sql` (colonne `materiel.image_chemin`, table `fiche_detention`, fiches des affectations existantes), puis `uv sync` (ajoute `reportlab` et `python-multipart`).
+
+- Les fichiers envoyés sont dans `UPLOAD_DIR` (défaut `uploads/`) ; `STRUCTURE_NAME` est imprimé sur les fiches PDF.
+- `POST/GET/DELETE /materiels/{id}/image` : image du matériel (JPEG, PNG, WebP, 5 Mo).
+- Créer une affectation crée sa fiche `FD-AAAA-NNNN` (non signée). `GET /affectations/{id}/fiche`, `GET /fiches-detention` (liste croisée), `GET /fiches-detention/{id}/pdf`, `POST /fiches-detention/{id}/signer` (date + scan facultatif), `POST /fiches-detention/{id}/annuler-signature`.
+- Une affectation dont la fiche est signée ne peut pas être supprimée (conservation 5 ans).

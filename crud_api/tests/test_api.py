@@ -241,3 +241,48 @@ async def test_authentication_when_enabled(client, monkeypatch):
     await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=auth)
     entries = (await client.get("/journal-audit", headers=auth)).json()
     assert any(e["action"] == "CREATE" and e["utilisateur_id"] is not None for e in entries)
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+async def test_fiche_detention_chain(client):
+    agent = await make_agent(client, "M9")
+    m = await make_materiel(client, "ORD-9", caracteristiques="RAM: 16 Go, Stockage: 512 Go, OS: Windows 11")
+    a = await post(client, "/affectations", {"materiel_id": m["id"], "agent_id": agent["id"]})
+
+    # la creation de l'affectation genere la fiche (non signee)
+    f = (await client.get(f"/affectations/{a['id']}/fiche")).json()
+    assert f["statut"] == "NON_SIGNEE" and f["reference"].startswith("FD-") and f["agent_matricule"] == "M9"
+    assert len((await client.get("/fiches-detention")).json()) == 1
+
+    pdf = await client.get(f"/fiches-detention/{f['id']}/pdf")
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+    r = await client.post(f"/fiches-detention/{f['id']}/signer", data={"date_signature": "2000-01-01"})
+    assert r.status_code == 422 and r.json()["field"] == "date_signature"  # avant la remise
+    r = await client.post(f"/fiches-detention/{f['id']}/signer", data={"date_signature": a["date_remise"]})
+    assert r.status_code == 200 and r.json()["statut"] == "SIGNEE"
+
+    # fiche signee : l'affectation ne peut pas etre supprimee
+    assert (await client.delete(f"/affectations/{a['id']}")).status_code == 409
+    r = await client.post(f"/fiches-detention/{f['id']}/annuler-signature")
+    assert r.json()["statut"] == "NON_SIGNEE" and r.json()["date_signature"] is None
+    assert (await client.delete(f"/affectations/{a['id']}")).status_code == 204
+    assert (await client.get("/fiches-detention")).json() == []
+
+
+async def test_image_materiel(client, tmp_path):
+    get_settings().upload_dir = str(tmp_path)
+    m = await make_materiel(client, "ORD-IMG")
+    assert m["a_image"] is False
+    assert (await client.get(f"/materiels/{m['id']}/image")).status_code == 404
+
+    bad = await client.post(f"/materiels/{m['id']}/image", files={"file": ("x.png", b"pas une image", "image/png")})
+    assert bad.status_code == 422 and bad.json()["field"] == "file"
+
+    ok = await client.post(f"/materiels/{m['id']}/image", files={"file": ("x.png", PNG, "image/png")})
+    assert ok.status_code == 200 and ok.json()["a_image"] is True
+    assert (await client.get(f"/materiels/{m['id']}/image")).content == PNG
+    assert (await client.delete(f"/materiels/{m['id']}/image")).status_code == 204
+    assert (await client.get(f"/materiels/{m['id']}")).json()["a_image"] is False

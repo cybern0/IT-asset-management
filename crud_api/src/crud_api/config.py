@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     # Si renseigne et qu'aucun utilisateur n'existe, cree le compte `admin` au demarrage
     bootstrap_admin_password: str | None = None
 
+    # Fichiers envoyes (relatif au dossier de lancement, ou chemin absolu)
+    upload_dir: str = "uploads"
+    max_image_mb: int = 5
+    max_scan_mb: int = 10
+
+    # Nom de la structure imprime sur les fiches de detention (PDF)
+    structure_name: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
