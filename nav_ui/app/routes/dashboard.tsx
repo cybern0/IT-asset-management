@@ -1,11 +1,251 @@
+import { useState } from "react";
+import { TimeChart } from "../components/dashboard/TimeChart";
+import {
+  downloadExport, PERIODS, useDashboard,
+  type Alert, type Cell, type DashTable, type Indicator, type Objective, type Txt,
+} from "../lib/dashboard";
+import { ApiError } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
-/** Tableau de bord : page vide pour l'instant. */
+const PRIORITY_TONE = { Haute: "bad", Moyenne: "warn", Basse: "ok" } as const;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const DECIMALS3 = new Set(["stock", "seuil", "manque"]);
+/** Petits tableaux affichés côte à côte ; les autres occupent toute la largeur (5 colonnes ou plus). */
+const PAIRED = new Set(["etats", "ages"]);
+
+/** Formatage des nombres, dates et textes traduisibles du rapport (langue de l'interface). */
+function useFormat() {
+  const { t, lang } = useI18n();
+  const locale = lang === "mg" ? "fr" : lang;
+  const nf = (max: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: max });
+  const n1 = nf(1);
+  const txt = (v: Txt): string => (typeof v === "string" ? t(v) : t(v.t, v.p));
+  const cell = (key: string, v: Cell): string => {
+    if (v === null || v === undefined) return "—";
+    if (typeof v === "number") return nf(DECIMALS3.has(key) ? 3 : 1).format(v);
+    if (typeof v === "object") return txt(v);
+    if (ISO_DATE.test(v)) return new Date(`${v}T00:00:00`).toLocaleDateString(locale);
+    return t(v);
+  };
+  const signed = (v: number | null) => (v === null ? "—" : v === 0 ? "0" : `${v > 0 ? "+" : "−"}${n1.format(Math.abs(v))}`);
+  const objective = (o: Objective | null) =>
+    !o ? "—" : o.op === "between" ? `${n1.format(o.min)}-${n1.format(o.max)} %` : `${o.op === ">=" ? "≥" : "≤"} ${n1.format(o.value)}`;
+  const value = (i: Indicator) => n1.format(i.value) + (i.unit === "%" ? " %" : "");
+  return { t, txt, cell, signed, objective, value, date: (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString(locale) };
+}
+
+type Fmt = ReturnType<typeof useFormat>;
+
 export default function Dashboard() {
   const { t } = useI18n();
+  const f = useFormat();
+  const [months, setMonths] = useState<number>(12);
+  const { report, status, error, reload } = useDashboard(months);
+  const [busy, setBusy] = useState<"pdf" | "xlsx" | null>(null);
+  const [exportError, setExportError] = useState("");
+
+  async function exportAs(kind: "pdf" | "xlsx") {
+    setBusy(kind);
+    setExportError("");
+    try {
+      await downloadExport(kind, months);
+    } catch (e) {
+      setExportError(e instanceof ApiError ? e.message : t("L’export a échoué."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <header className="page-head">
-      <h1>{t("Tableau de bord")}</h1>
-    </header>
+    <>
+      <header className="page-head dash-head">
+        <div>
+          <h1>{t("Tableau de bord")}</h1>
+          {report && <p className="lede">{t("Données au {date}.", { date: f.date(report.generated_at) })}</p>}
+        </div>
+        <div className="dash-tools">
+          <label className="dash-period">
+            <span>{t("Évolution sur")}</span>
+            <select value={months} onChange={(e) => setMonths(Number(e.target.value))}>
+              {PERIODS.map((p) => <option key={p} value={p}>{t("{n} mois", { n: p })}</option>)}
+            </select>
+          </label>
+          <button type="button" className="btn ghost" onClick={reload} disabled={status === "loading"}>{t("Actualiser")}</button>
+          <button type="button" className="btn ghost" onClick={() => void exportAs("xlsx")} disabled={!report || busy !== null}>
+            {busy === "xlsx" ? t("Export en cours…") : t("Exporter en Excel")}
+          </button>
+          <button type="button" className="btn primary" onClick={() => void exportAs("pdf")} disabled={!report || busy !== null}>
+            {busy === "pdf" ? t("Export en cours…") : t("Exporter en PDF")}
+          </button>
+        </div>
+      </header>
+
+      {exportError && <p className="error" role="alert">{exportError}</p>}
+
+      <div className="dash">
+        {status === "error" && !report && (
+          <div className="api-banner" role="alert">
+            <span><strong>{t("Le tableau de bord n’a pas pu être chargé.")}</strong> {t(error)}</span>
+            <button type="button" className="btn ghost" onClick={reload}>{t("Réessayer")}</button>
+          </div>
+        )}
+        {status === "loading" && !report && <p className="api-loading" role="status">{t("Chargement des données…")}</p>}
+
+        {report && (
+          <div className={status === "loading" ? "dash-body is-stale" : "dash-body"} aria-busy={status === "loading"}>
+            <Section title="Vue d’ensemble du parc">
+              <Overview rows={report.overview} f={f} />
+            </Section>
+
+            <Section title="Alertes et actions recommandées">
+              <Alerts alerts={report.alerts} f={f} />
+            </Section>
+
+            <Section title="Répartition du parc">
+              <div className="dash-grid">
+                {pick(report.tables, ["categories", "etats", "ages", "provenances"]).map((tb) => (
+                  <Card key={tb.code} wide={!PAIRED.has(tb.code)}><DataTable table={tb} f={f} /></Card>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Détention et dossiers d’attribution">
+              <div className="dash-grid">
+                {pick(report.tables, ["services", "dossiers", "detentions"]).map((tb) => (
+                  <Card key={tb.code} wide={!PAIRED.has(tb.code)}><DataTable table={tb} f={f} /></Card>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Consommables et licences">
+              <div className="dash-grid">
+                {pick(report.tables, ["consommables", "licences", "licences_echeance"]).map((tb) => (
+                  <Card key={tb.code} wide={!PAIRED.has(tb.code)}><DataTable table={tb} f={f} /></Card>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Évolution dans le temps">
+              <div className="dash-grid">
+                {report.evolution.charts.map((c) => (
+                  <Card key={c.code}><TimeChart chart={c} labels={report.evolution.labels} /></Card>
+                ))}
+              </div>
+            </Section>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+const pick = (tables: DashTable[], codes: string[]) =>
+  codes.map((c) => tables.find((x) => x.code === c)).filter((x): x is DashTable => !!x);
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const { t } = useI18n();
+  return (
+    <section className="dash-section">
+      <h2>{t(title)}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Card({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+  return <div className={`dash-card${wide ? " wide" : ""}`}>{children}</div>;
+}
+
+function Overview({ rows, f }: { rows: Indicator[]; f: Fmt }) {
+  const { t } = f;
+  return (
+    <div className="dash-card table-wrap">
+      <table className="table dash-table">
+        <thead>
+          <tr>
+            <th>{t("Indicateur")}</th><th className="num">{t("Valeur")}</th><th className="num">{t("Objectif")}</th>
+            <th className="num">{t("Écart")}</th><th className="center">{t("Statut")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.code}>
+              <th scope="row">{f.txt(r.label)}</th>
+              <td className="num">{f.value(r)}</td>
+              <td className="num">{f.objective(r.objective)}</td>
+              <td className="num">{f.signed(r.ecart)}</td>
+              <td className="center">
+                {r.tone === "none" ? "—" : <span className="badge" data-tone={r.tone}>{t(r.statut)}</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Alerts({ alerts, f }: { alerts: Alert[]; f: Fmt }) {
+  const { t } = f;
+  if (alerts.length === 0) return <p className="empty">{t("Aucune alerte : tous les indicateurs sont dans leurs objectifs.")}</p>;
+  return (
+    <div className="dash-card table-wrap">
+      <table className="table dash-table">
+        <thead>
+          <tr><th className="center">{t("Priorité")}</th><th>{t("Alerte")}</th><th>{t("Action recommandée")}</th></tr>
+        </thead>
+        <tbody>
+          {alerts.map((a, i) => (
+            <tr key={i}>
+              <td className="center"><span className="badge" data-tone={PRIORITY_TONE[a.priorite]}>{t(a.priorite)}</span></td>
+              <td>{f.txt(a.alerte)}</td>
+              <td>{f.txt(a.action)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DataTable({ table, f }: { table: DashTable; f: Fmt }) {
+  const { t } = f;
+  const total = table.total;
+  return (
+    <>
+      <h3 className="dash-card-title">{t(table.title)}</h3>
+      {table.rows.length === 0 ? (
+        <p className="empty">{t("Aucune donnée à afficher.")}</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="table dash-table">
+            <thead>
+              <tr>{table.columns.map((c) => <th key={c.key} className={c.align === "right" ? "num" : undefined}>{t(c.label)}</th>)}</tr>
+            </thead>
+            <tbody>
+              {table.rows.map((r, i) => (
+                <tr key={i}>
+                  {table.columns.map((c) => (
+                    <td key={c.key} className={c.align === "right" ? "num" : undefined}>{f.cell(c.key, r[c.key])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+            {total && (
+              <tfoot>
+                <tr>
+                  {table.columns.map((c) => (
+                    <td key={c.key} className={c.align === "right" ? "num" : undefined}>
+                      {total[c.key] === null || total[c.key] === "" ? "" : f.cell(c.key, total[c.key])}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      )}
+      {table.note && <p className="chart-note">{f.txt(table.note)}</p>}
+    </>
   );
 }

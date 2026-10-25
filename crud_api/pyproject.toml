@@ -12,6 +12,7 @@ dependencies = [
     "asyncpg>=0.32.0",
     "email-validator>=2.1.0",
     "fastapi>=0.156.4",
+    "openpyxl>=3.1.5",
     "pydantic-settings>=2.4.0",
     "pyjwt>=2.8.0",
     "python-multipart>=0.0.9",
@@ -36,6 +37,7 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["nodb: test de calcul pur, sans base de donnees"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"

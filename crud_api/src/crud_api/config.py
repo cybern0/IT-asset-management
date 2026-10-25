@@ -41,6 +41,19 @@ class Settings(BaseSettings):
     # Nom de la structure imprime sur les fiches de detention (PDF)
     structure_name: str = ""
 
+    # Tableau de bord : objectifs et seuils (les statuts OK / Alerte en decoulent)
+    objectif_attribution_min: float = 75  # taux d'attribution cible, en %
+    objectif_attribution_max: float = 85
+    objectif_stock_min: int = 50  # equipements en stock
+    objectif_maintenance_max: int = 15
+    objectif_age_moyen_max: float = 3.5  # ans
+    objectif_anciens_max: int = 40  # equipements de plus de `age_ancien_ans`
+    age_ancien_ans: int = 5
+    stock_categorie_alerte_pct: float = 10  # stock faible si < x % du total de la categorie
+    stock_categorie_cible_pct: float = 15  # on recommande de recompleter jusqu'a x %
+    licence_alerte_jours: int = 60  # licence bientot expiree
+    dossier_retard_jours: int = 30  # dossier d'attribution ouvert depuis trop longtemps
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

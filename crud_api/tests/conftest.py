@@ -30,7 +30,8 @@ def pytest_collection_modifyitems(config, items):
         return
     skip = pytest.mark.skip(reason="TEST_DATABASE_URL non defini")
     for item in items:
-        item.add_marker(skip)
+        if "nodb" not in item.keywords:  # `nodb` = test de calcul pur, sans base
+            item.add_marker(skip)
 
 
 async def _run_scripts(*, reset: bool) -> None:
