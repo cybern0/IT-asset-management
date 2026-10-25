@@ -246,30 +246,65 @@ async def test_authentication_when_enabled(client, monkeypatch):
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
 
 
-async def test_fiche_detention_chain(client):
+async def test_attribution_workflow(client):
     agent = await make_agent(client, "M9")
     m = await make_materiel(client, "ORD-9", caracteristiques="RAM: 16 Go, Stockage: 512 Go, OS: Windows 11")
-    a = await post(client, "/affectations", {"materiel_id": m["id"], "agent_id": agent["id"]})
 
-    # la creation de l'affectation genere la fiche (non signee)
-    f = (await client.get(f"/affectations/{a['id']}/fiche")).json()
-    assert f["statut"] == "NON_SIGNEE" and f["reference"].startswith("FD-") and f["agent_matricule"] == "M9"
-    assert len((await client.get("/fiches-detention")).json()) == 1
+    # etape 1 : demande, puis validation du manager
+    f = await post(client, "/attributions", {"agent_id": agent["id"], "besoin": "PC portable", "canal": "TICKET"})
+    assert f["etape"] == 1 and f["etat"] == "EN_COURS" and f["reference"].startswith("FD-")
+    r = await client.post(f"/attributions/{f['id']}/selectionner", json={"materiel_id": m["id"]})
+    assert r.status_code == 409  # pas encore validee
+    f = await post(client, f"/attributions/{f['id']}/valider", {"valide_par": "Mme Rabe"}, 200)
+    assert f["etape"] == 2
 
-    pdf = await client.get(f"/fiches-detention/{f['id']}/pdf")
+    # etapes 2-3 : equipement choisi, fiche generee (PDF disponible)
+    f = await post(client, f"/attributions/{f['id']}/selectionner", {"materiel_id": m["id"]}, 200)
+    assert f["etape"] == 4 and f["date_generation"] and f["materiel_code"] == "ORD-9"
+    pdf = await client.get(f"/attributions/{f['id']}/pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
 
-    r = await client.post(f"/fiches-detention/{f['id']}/signer", data={"date_signature": "2000-01-01"})
-    assert r.status_code == 422 and r.json()["field"] == "date_signature"  # avant la remise
-    r = await client.post(f"/fiches-detention/{f['id']}/signer", data={"date_signature": a["date_remise"]})
-    assert r.status_code == 200 and r.json()["statut"] == "SIGNEE"
+    # le materiel est reserve par ce dossier
+    other = await post(client, "/attributions", {"agent_id": agent["id"], "valide_par": "Mme Rabe"})
+    r = await client.post(f"/attributions/{other['id']}/selectionner", json={"materiel_id": m["id"]})
+    assert r.status_code == 409 and r.json()["field"] == "materiel_id"
+
+    # etape 5 impossible tant que la fiche n'est pas signee
+    assert (await client.post(f"/attributions/{f['id']}/remettre", json={})).status_code == 409
+    r = await client.post(f"/attributions/{f['id']}/signer", data={"mode_signature": "MANUSCRITE", "date_signature": "2000-01-01"})
+    assert r.status_code == 422 and r.json()["field"] == "date_signature"
+    r = await client.post(
+        f"/attributions/{f['id']}/signer", data={"mode_signature": "ELECTRONIQUE", "signe_par": "Resp. Info"}
+    )
+    assert r.status_code == 200 and r.json()["statut"] == "SIGNEE" and r.json()["etape"] == 5
+
+    # etapes 5-6 : remise -> affectation creee, materiel « Attribue »
+    f = await post(
+        client, f"/attributions/{f['id']}/remettre",
+        {"etat_constate": "BON", "accessoires": ["Chargeur", "Souris"], "accessoires_autre": "Casque"}, 200,
+    )
+    assert f["etape"] == 6 and f["etat"] == "ATTRIBUEE" and f["affectation_id"]
+    assert f["accessoires"] == ["Chargeur", "Souris"]
+    assert (await client.get(f"/materiels/{m['id']}")).json()["statut"] == "ATTRIBUE"
+    assert len((await client.get("/affectations")).json()) == 1  # une seule affectation, pas de doublon
 
     # fiche signee : l'affectation ne peut pas etre supprimee
-    assert (await client.delete(f"/affectations/{a['id']}")).status_code == 409
-    r = await client.post(f"/fiches-detention/{f['id']}/annuler-signature")
-    assert r.json()["statut"] == "NON_SIGNEE" and r.json()["date_signature"] is None
-    assert (await client.delete(f"/affectations/{a['id']}")).status_code == 204
-    assert (await client.get("/fiches-detention")).json() == []
+    assert (await client.delete(f"/affectations/{f['affectation_id']}")).status_code == 409
+
+
+async def test_attribution_refus_et_regularisation(client):
+    agent = await make_agent(client, "M8")
+    f = await post(client, "/attributions", {"agent_id": agent["id"]})
+    r = await client.post(f"/attributions/{f['id']}/refuser", json={"motif": "Pas de budget"})
+    assert r.json()["etat"] == "REFUSEE"
+    assert (await client.post(f"/attributions/{f['id']}/valider", json={"valide_par": "X"})).status_code == 409
+
+    # affectation saisie directement : un dossier de regularisation est cree
+    m = await make_materiel(client, "ORD-8")
+    a = await post(client, "/affectations", {"materiel_id": m["id"], "agent_id": agent["id"]})
+    d = (await client.get(f"/affectations/{a['id']}/attribution")).json()
+    assert d["etape"] == 6 and d["valide_par"] == "Régularisation" and d["statut"] == "NON_SIGNEE"
+    assert (await client.delete(f"/affectations/{a['id']}")).status_code in (204, 409)
 
 
 async def test_image_materiel(client, tmp_path):

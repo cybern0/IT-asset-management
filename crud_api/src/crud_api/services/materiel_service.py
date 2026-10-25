@@ -131,8 +131,8 @@ class AffectationService(CRUDService[Affectation]):
         return values
 
     async def after_create(self, db: AsyncSession, obj: Affectation) -> None:
-        # chaine : affectation -> fiche de detention (NON_SIGNEE), dans la meme transaction
-        await fiche_service.ensure_for_affectation(db, obj.id)
+        # rattache le dossier d'attribution en cours, ou cree un dossier de regularisation (meme transaction)
+        await fiche_service.attach_or_create(db, obj)
 
     async def before_delete(self, db: AsyncSession, obj: Affectation) -> None:
         fiche = await db.scalar(select(FicheDetention).where(FicheDetention.affectation_id == obj.id))

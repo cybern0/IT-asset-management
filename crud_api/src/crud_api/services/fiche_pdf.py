@@ -121,7 +121,8 @@ def build_pdf(d: dict[str, Any], structure_name: str = "") -> bytes:
     story.append(head)
 
     signee = d["statut"] == "SIGNEE"
-    statut = f"Signée le {_fr(d['date_signature'])}" if signee else "Non signée"
+    mode = {"MANUSCRITE": "manuscrite", "ELECTRONIQUE": "électronique"}.get(d["mode_signature"] or "", "")
+    statut = f"Signée le {_fr(d['date_signature'])}" + (f" ({mode})" if mode else "") if signee else "Non signée"
     color = "#25502a" if signee else "#8a5a00"
     story += [
         Spacer(1, 6),
@@ -147,7 +148,10 @@ def build_pdf(d: dict[str, Any], structure_name: str = "") -> bytes:
             ("N° de série constructeur", d["materiel_serie"] or ""),
             ("Type d’équipement", _checks(_type_equipement(d))),
             ("Configuration", config),
-            ("Accessoires fournis", _checks([(a, False) for a in _ACCESSOIRES] + [("Autre : ...............", False)])),
+            ("Accessoires fournis", _checks(
+                [(a, a in d["accessoires"]) for a in _ACCESSOIRES]
+                + [(f"Autre : {d['accessoires_autre']}" if d["accessoires_autre"] else "Autre : ...............", bool(d["accessoires_autre"]))]
+            )),
         ], width),
     ]
 
@@ -187,7 +191,7 @@ def build_pdf(d: dict[str, Any], structure_name: str = "") -> bytes:
                 _p("Date : ....../....../.........."), Spacer(1, 3), _p("Signature :"), Spacer(1, 16)]
 
     sig = Table(
-        [[sign_cell("Le détenteur", nom), sign_cell("Le service informatique", d["saisi_par"] or "")]],
+        [[sign_cell("Le détenteur", nom), sign_cell("Le service informatique", d["signe_par"] or d["saisi_par"] or "")]],
         colWidths=[width / 2, width / 2],
     )
     sig.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.5, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE),

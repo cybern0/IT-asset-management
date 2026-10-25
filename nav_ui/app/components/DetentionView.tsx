@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import { ficheLabel, fmtDate, type Detention } from "../lib/detention";
+import {
+  agentName, downloadPdf, ETAT_LABEL, ficheLabel, fmtDate, openScan, type Attribution as Detention,
+} from "../lib/detention";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
 import { tone } from "../lib/schema";
-import { FicheActions } from "./FicheActions";
 import { Lightbox } from "./Lightbox";
 import { Modal } from "./Modal";
 
@@ -25,7 +26,7 @@ export function DetentionView() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    try { setItems(await api.get<Detention[]>("/fiches-detention?limit=5000")); }
+    try { setItems(await api.get<Detention[]>("/attributions?limit=5000")); }
     catch (e) { setError(e instanceof ApiError ? (e.network ? t("Impossible de joindre l’API.") : e.message) : t("Erreur inattendue.")); }
     finally { setLoading(false); }
   }, [t]);
@@ -36,16 +37,16 @@ export function DetentionView() {
     const a = norm(qAgent.trim());
     const m = norm(qMat.trim());
     return items.filter((d) => {
+      if (d.materiel_id === null || d.cloture) return false;
       if (a && !norm(`${d.agent_nom} ${d.agent_prenom} ${d.agent_prenom} ${d.agent_nom} ${d.agent_matricule}`).includes(a)) return false;
       if (m && !norm(`${d.materiel_designation} ${d.materiel_code} ${d.materiel_marque ?? ""} ${d.materiel_modele ?? ""} ${d.materiel_serie ?? ""}`).includes(m)) return false;
       if (fiche && d.statut !== fiche) return false;
-      if (etat && (etat === "EN_COURS") !== d.en_cours) return false;
+      if (etat && d.etat !== etat) return false;
       return true;
     });
   }, [items, qAgent, qMat, fiche, etat]);
 
   const current = items.find((d) => d.id === openId) ?? null;
-  const replace = (f: Detention) => setItems((list) => list.map((d) => (d.id === f.id ? f : d)));
 
   return (
     <section className="pane global">
@@ -62,8 +63,9 @@ export function DetentionView() {
         </label>
         <select value={etat} onChange={(e) => setEtat(e.target.value)} aria-label={t("Détention")}>
           <option value="">{t("Toutes les détentions")}</option>
+          <option value="ATTRIBUEE">{t("Attribué")}</option>
           <option value="EN_COURS">{t("En cours")}</option>
-          <option value="RENDUE">{t("Rendues")}</option>
+          <option value="RENDUE">{t("Rendu")}</option>
         </select>
         <select value={fiche} onChange={(e) => setFiche(e.target.value)} aria-label={t("Fiche de détention")}>
           <option value="">{t("Toutes les fiches")}</option>
@@ -92,10 +94,10 @@ export function DetentionView() {
               {visible.map((d) => (
                 <tr key={d.id}>
                   <td><strong>{d.materiel_designation}</strong><br /><span className="hint">{d.materiel_code}</span></td>
-                  <td>{d.agent_nom} {d.agent_prenom}<br /><span className="hint">{d.agent_matricule}</span></td>
+                  <td>{agentName(d)}<br /><span className="hint">{d.agent_matricule}</span></td>
                   <td>{d.service_nom ?? "—"}</td>
-                  <td>{fmtDate(d.date_remise)}</td>
-                  <td><span className="badge" data-tone={d.en_cours ? "ok" : "neutral"}>{t(d.en_cours ? "Active" : "Rendue")}</span></td>
+                  <td>{fmtDate(d.date_remise) || "—"}</td>
+                  <td><span className="badge" data-tone={d.etat === "EN_COURS" ? "warn" : tone(ETAT_LABEL[d.etat])}>{d.etat === "EN_COURS" ? `${t("Étape")} ${d.etape}/6` : t(ETAT_LABEL[d.etat])}</span></td>
                   <td><span className="badge" data-tone={tone(ficheLabel(d))}>{t(ficheLabel(d))}</span></td>
                   <td><button type="button" className="btn ghost" onClick={() => setOpenId(d.id)}>{t("Voir")}</button></td>
                 </tr>
@@ -107,14 +109,14 @@ export function DetentionView() {
 
       {current && (
         <Modal title={`${t("Fiche de détention")} ${current.reference}`} wide onClose={() => setOpenId(null)}>
-          <DetentionDetail d={current} onChange={replace} />
+          <DetentionDetail d={current} />
         </Modal>
       )}
     </section>
   );
 }
 
-function DetentionDetail({ d, onChange }: { d: Detention; onChange: (f: Detention) => void }) {
+function DetentionDetail({ d }: { d: Detention }) {
   const { t } = useI18n();
   const [src, setSrc] = useState<string | null>(null);
   const [zoom, setZoom] = useState(false);
@@ -138,17 +140,22 @@ function DetentionDetail({ d, onChange }: { d: Detention; onChange: (f: Detentio
 
   return (
     <>
-      <FicheActions fiche={d} onChange={onChange} />
+      <div className="fiche-row">
+        <span className="badge" data-tone={tone(ficheLabel(d))}>{t(ficheLabel(d))}</span>
+        {d.statut === "SIGNEE" && <span className="hint">{t("le {d}", { d: fmtDate(d.date_signature) })}</span>}
+        <button type="button" className="btn primary" onClick={() => void downloadPdf(d)}>{t("Exporter en PDF")}</button>
+        {d.a_fichier_signe && <button type="button" className="btn ghost" onClick={() => void openScan(d)}>{t("Voir le scan signé")}</button>}
+      </div>
       <div className="detail-grid">
         <section>
           <h3>{t("Matériel")}</h3>
           {src && (
             <button type="button" className="thumb-btn" onClick={() => setZoom(true)} title={t("Cliquer pour agrandir")} aria-label={t("Cliquer pour agrandir")}>
-              <img className="thumb" src={src} alt={d.materiel_designation} />
+              <img className="thumb" src={src} alt={d.materiel_designation ?? ""} />
             </button>
           )}
           {zoom && src && (
-            <Lightbox src={src} alt={d.materiel_designation} newTabHref={`/image/${d.materiel_id}`} onClose={() => setZoom(false)} />
+            <Lightbox src={src} alt={d.materiel_designation ?? ""} newTabHref={`/image/${d.materiel_id}`} onClose={() => setZoom(false)} />
           )}
           <dl>
             {row("Désignation", d.materiel_designation)}
@@ -164,7 +171,7 @@ function DetentionDetail({ d, onChange }: { d: Detention; onChange: (f: Detentio
         <section>
           <h3>{t("Agent détenteur")}</h3>
           <dl>
-            {row("Nom et prénom", `${d.agent_nom} ${d.agent_prenom}`)}
+            {row("Nom et prénom", agentName(d))}
             {row("Matricule", d.agent_matricule)}
             {row("Fonction", d.agent_fonction)}
             {row("Service", d.service_nom)}
@@ -175,6 +182,7 @@ function DetentionDetail({ d, onChange }: { d: Detention; onChange: (f: Detentio
           <h3>{t("Affectation")}</h3>
           <dl>
             {row("Date de remise", fmtDate(d.date_remise))}
+            {row("Validée par", d.valide_par)}
             {row("Date de retour", fmtDate(d.date_retour))}
             {row("Enregistrée par", d.saisi_par)}
             {row("Observations", d.observations)}

@@ -11,7 +11,7 @@ export function Modal({ title, onClose, wide, children }: {
   useEffect(() => {
     const el = ref.current;
     if (el && !el.open) el.showModal();
-    return () => el?.close();
+    // pas de close() au demontage : en mode dev (StrictMode) il declenchait onClose et refermait la fenetre aussitot
   }, []);
 
   return (

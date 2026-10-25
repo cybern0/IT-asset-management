@@ -1,4 +1,5 @@
 import { Navigate, NavLink, useLocation, useParams } from "react-router";
+import { AttributionsView } from "../components/AttributionsView";
 import { CrudPanel } from "../components/CrudPanel";
 import { GlobalView } from "../components/GlobalView";
 import { useI18n } from "../lib/i18n";
@@ -38,7 +39,7 @@ export default function Module() {
               {g.entities.map((e) => (
                 <NavLink key={e.key} to={`/${section.slug}/${g.slug}/${e.key}`} className="tab">
                   {t(e.label)}
-                  <span className="count">{rowsFor(e, rows).length}</span>
+                  {!e.custom && <span className="count">{rowsFor(e, rows).length}</span>}
                 </NavLink>
               ))}
             </nav>
@@ -48,7 +49,8 @@ export default function Module() {
               {t("Cette rubrique n’existe pas encore dans parc.sql : les champs sont provisoires.")}
             </p>
           )}
-          {entity && <CrudPanel key={entity.key} entity={entity} />}
+          {entity?.custom === "attributions" && <AttributionsView />}
+          {entity && !entity.custom && <CrudPanel key={entity.key} entity={entity} />}
         </>
       )}
     </>

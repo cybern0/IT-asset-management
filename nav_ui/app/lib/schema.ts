@@ -59,6 +59,10 @@ export type Entity = {
   local?: boolean;
   /** Boutons propres a l'onglet : image du materiel, fiche de detention d'une affectation. */
   extras?: ("image" | "fiche")[];
+  /** Pas de bouton + (la creation passe par un autre circuit, ex. Attributions). */
+  noCreate?: boolean;
+  /** Onglet a ecran dedie (au lieu du CRUD generique). */
+  custom?: "attributions";
   readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
   immutable?: boolean; // creation seulement (ex. mouvements de stock)
   validate?: (
@@ -175,6 +179,7 @@ const materiel: Entity[] = [
     titleFields: ["materiel_id"], subtitleFields: ["agent_id"],
     badgeFn: (r) => (r.date_retour ? "Rendue" : "Active"),
     extras: ["fiche"],
+    noCreate: true,
     fields: [
       ref("materiel_id", "Matériel", "materiel", { required: true }),
       ref("agent_id", "Agent", "agent", { required: true }),
@@ -196,6 +201,9 @@ const materiel: Entity[] = [
       return e;
     },
     seed: [{ materiel_id: "computers-seed-0", agent_id: "a1", date_remise: "2026-09-01", etat_remise: "BON" }],
+  }),  ent({
+    key: "attributions", label: "Attributions", singular: "une attribution", table: "affectation",
+    custom: "attributions", titleFields: ["id"], fields: [],
   }),
 ];
 
@@ -595,7 +603,7 @@ export function viewOf(
 
 const OK = ["Attribué", "Oui", "Active", "Envoyée", "Terminé", "Signée"];
 const WARN = ["En maintenance", "En cours", "En attente", "Expirée", "Suspendue", "Non signée"];
-const BAD = ["Réformé", "Non", "Échec", "Sous le seuil", "Résiliée"];
+const BAD = ["Réformé", "Non", "Échec", "Sous le seuil", "Résiliée", "Refusée", "Annulée"];
 
 export function tone(value: string): "ok" | "warn" | "bad" | "neutral" {
   if (OK.includes(value)) return "ok";

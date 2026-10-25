@@ -24,7 +24,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
   const hiddenName = w && !w.negate ? (w.via?.setField ?? w.field) : null;
   const shown = entity.fields.filter((f) => f.name !== hiddenName);
 
-  const canCreate = !entity.readOnly;
+  const canCreate = !entity.readOnly && !entity.noCreate;
   const canEdit = !entity.readOnly && !entity.immutable;
 
   const [query, setQuery] = useState("");

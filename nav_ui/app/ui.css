@@ -321,3 +321,38 @@ fieldset.fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .lightbox-bar .btn.ghost { background: rgba(255, 255, 255, 0.92); text-decoration: none; }
 .image-page { position: fixed; inset: 0; display: grid; place-items: center; background: #0a100e; color: #fff; overflow: auto; }
 .image-page img { max-width: 100vw; max-height: 100dvh; object-fit: contain; }
+
+/* ---------- circuit d'attribution en 6 etapes ---------- */
+.attrib { padding: 14px; display: grid; gap: 12px; }
+.attrib-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.head-actions { display: flex; gap: 8px; }
+.filters.tight { padding: 6px 14px; }
+.notice-box { padding: 10px 12px; border-radius: 8px; background: var(--warn-bg); color: var(--warn-ink); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.step { display: grid; grid-template-columns: 44px minmax(0, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.step-n { display: grid; place-items: center; font-weight: 700; background: #e3e9e1; color: var(--ink); }
+.step[data-state="done"] .step-n { background: var(--ok-bg); color: var(--ok-ink); }
+.step[data-state="current"] { border-color: var(--pine); box-shadow: 0 0 0 1px var(--pine); }
+.step[data-state="current"] .step-n { background: var(--pine); color: #fff; }
+.step[data-state="todo"], .step[data-state="closed"] { opacity: 0.6; }
+.step-main { padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.step-main h3 { font-size: 15px; font-weight: 700; }
+.step-sum { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+dl.mini { margin: 0; display: grid; grid-template-columns: 11em minmax(0, 1fr); gap: 3px 12px; font-size: 14px; }
+dl.mini dt { color: var(--muted); }
+dl.mini dd { margin: 0; overflow-wrap: anywhere; }
+.step-form { display: grid; gap: 10px; padding: 10px 12px; background: var(--paper); border-radius: 8px; }
+.step-form label { display: grid; gap: 4px; font-weight: 600; font-size: 14px; }
+.step-form input:not([type="checkbox"]):not([type="radio"]), .step-form select, .step-form textarea { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font: inherit; font-weight: 400; }
+.step-form .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.step-form .row > * { flex: 1 1 160px; }
+.step-form .row > .btn { flex: 0 0 auto; }
+.pick { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.pick-item { display: flex !important; grid-template-columns: none; gap: 8px; align-items: flex-start; padding: 8px 10px; font-weight: 400 !important; cursor: pointer; border-bottom: 1px solid var(--line); }
+.pick-item:hover { background: #eef1ea; }
+.block { display: block; }
+.checks { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; display: flex; gap: 14px; flex-wrap: wrap; }
+.check { display: flex !important; gap: 6px; align-items: center; font-weight: 400 !important; }
+.attrib-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.attrib-foot input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; flex: 1 1 200px; }
