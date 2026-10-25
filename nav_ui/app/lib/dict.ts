@@ -412,6 +412,7 @@ const A: [string, string, string][] = [
   ["Rendu", "Returned", "Naverina"],
   ["Refusée", "Rejected", "Nolavina"],
   ["Annulée", "Cancelled", "Nofoanana"],
+  ["Tableau de bord", "Dashboard", "Tabilao fanaraha-maso"],
 ];
 
 // [anglais (clé), français, malgache] : noms de rubriques écrits en anglais dans le code

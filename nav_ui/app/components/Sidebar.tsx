@@ -29,6 +29,16 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav" aria-label={t("Navigation principale")}>
+        <div className="nav-section">
+          <ul>
+            <li>
+              <NavLink to="/dashboard" className="nav-link" title={t("Tableau de bord")}>
+                <Icon name="dashboard" />
+                <span className="label">{t("Tableau de bord")}</span>
+              </NavLink>
+            </li>
+          </ul>
+        </div>
         {sections.map((section) => {
           const isOpen = collapsed || !closed[section.slug];
           return (

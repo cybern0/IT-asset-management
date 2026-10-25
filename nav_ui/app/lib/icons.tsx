@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { IconName } from "./schema";
 
-export type UiIconName = IconName | "chevron" | "panel" | "plus" | "search";
+export type UiIconName = IconName | "dashboard" | "chevron" | "panel" | "plus" | "search";
 
 const paths: Record<UiIconName, ReactNode> = {
   monitor: <><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M8 20h8M12 16v4" /></>,
@@ -14,6 +14,7 @@ const paths: Record<UiIconName, ReactNode> = {
   sliders: <><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   scan: <><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" /></>,
+  dashboard: <><rect x="3" y="3" width="8" height="10" rx="1.5" /><rect x="13" y="3" width="8" height="6" rx="1.5" /><rect x="13" y="11" width="8" height="10" rx="1.5" /><rect x="3" y="15" width="8" height="6" rx="1.5" /></>,
   chevron: <path d="m9 6 6 6-6 6" />,
   panel: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
