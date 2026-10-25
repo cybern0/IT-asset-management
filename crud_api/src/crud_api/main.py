@@ -23,6 +23,13 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(
             "AUTH_ENABLED=true exige un JWT_SECRET d'au moins 32 caracteres (voir .env.example)."
         )
+    async with SessionLocal() as db:
+        encoding = (await db.execute(text("SHOW server_encoding"))).scalar_one()
+    if encoding.upper() != "UTF8":
+        logging.getLogger("crud_api").error(
+            "La base est en %s et non en UTF8 : les accents et caracteres speciaux seront alteres. "
+            "Recreez-la avec ENCODING 'UTF8' TEMPLATE template0.", encoding,
+        )
     if settings.bootstrap_admin_password:
         async with SessionLocal() as db:
             await user_service.bootstrap_admin(db, settings.bootstrap_admin_password)

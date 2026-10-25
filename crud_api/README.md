@@ -59,3 +59,7 @@ Exécuter `Base de données/parc_5.sql` (colonne `materiel.image_chemin`, table 
 - `POST/GET/DELETE /materiels/{id}/image` : image du matériel (JPEG, PNG, WebP, 5 Mo).
 - Créer une affectation crée sa fiche `FD-AAAA-NNNN` (non signée). `GET /affectations/{id}/fiche`, `GET /fiches-detention` (liste croisée), `GET /fiches-detention/{id}/pdf`, `POST /fiches-detention/{id}/signer` (date + scan facultatif), `POST /fiches-detention/{id}/annuler-signature`.
 - Une affectation dont la fiche est signée ne peut pas être supprimée (conservation 5 ans).
+
+## Encodage (accents)
+
+Les scripts SQL sont en UTF-8 et commencent par `SET client_encoding TO 'UTF8'`. Pour les exécuter sous Windows, utilisez `Base de données\charger.ps1 -Db <base>` (Linux : `./charger.sh <base>`) ; sinon faites `chcp 65001` et `$env:PGCLIENTENCODING = "UTF8"` avant `psql`. La base doit être créée en UTF8 : `CREATE DATABASE parc ENCODING 'UTF8' TEMPLATE template0;` (l'API journalise une erreur au démarrage si ce n'est pas le cas). L'API elle-même (asyncpg) échange toujours en UTF-8.

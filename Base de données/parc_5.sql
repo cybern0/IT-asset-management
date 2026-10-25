@@ -1,3 +1,6 @@
+-- Encodage : le script est en UTF-8, quel que soit le reglage par defaut du client (psql sous Windows = WIN1252)
+SET client_encoding TO 'UTF8';
+
 SET search_path TO eparc, public;
 
 -- Image du materiel : chemin relatif (dans UPLOAD_DIR) du fichier envoye par l'API

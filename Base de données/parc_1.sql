@@ -1,3 +1,6 @@
+-- Encodage : le script est en UTF-8, quel que soit le reglage par defaut du client (psql sous Windows = WIN1252)
+SET client_encoding TO 'UTF8';
+
 -- eparc : Systeme de gestion du parc informatique
 
 CREATE SCHEMA IF NOT EXISTS eparc;
