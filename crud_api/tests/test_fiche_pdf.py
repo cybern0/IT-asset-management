@@ -15,7 +15,7 @@ def dossier(**over):
         "canal": "TICKET", "reference_canal": "TCK-4521", "demandeur": "Hery Rabe (chef de service)",
         "date_demande": date(2026, 9, 28), "valide_par": "Directeur des Finances", "date_validation": date(2026, 9, 29),
         "date_generation": date(2026, 9, 30), "statut": "SIGNEE", "date_signature": date(2026, 10, 1),
-        "mode_signature": "MANUSCRITE", "signe_par": "R. Andry (Service informatique)", "a_fichier_signe": True,
+        "mode_signature": "MANUSCRITE", "signe_par": "R. Andry (Service informatique)",
         "date_remise": date(2026, 10, 2), "etat_constate": "NEUF", "accessoires": ["Chargeur", "Souris"],
         "accessoires_autre": "Câble HDMI", "observations_remise": "Rayure légère sur le capot.",
         "affectation_id": 12, "date_retour": None, "etat_retour": None, "observations": None, "saisi_par": "admin",

@@ -33,7 +33,6 @@ class FicheDetention(IdMixin, Base):
     date_signature: Mapped[date | None] = mapped_column(Date)
     mode_signature: Mapped[str | None] = mapped_column(String(15))
     signe_par: Mapped[str | None] = mapped_column(String(150))
-    fichier_signe_chemin: Mapped[str | None] = mapped_column(String(255))
     # etape 5
     date_remise: Mapped[date | None] = mapped_column(Date)
     etat_constate: Mapped[str | None] = mapped_column(String(15))

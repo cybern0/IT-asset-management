@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api, ApiError } from "../lib/api";
-import { downloadPdf, ETAT_LABEL, ficheLabel, fmtDate, openScan, type Attribution } from "../lib/detention";
+import { downloadPdf, ETAT_LABEL, ficheLabel, fmtDate, type Attribution } from "../lib/detention";
 import { useI18n } from "../lib/i18n";
 import { tone } from "../lib/schema";
 
@@ -41,9 +41,6 @@ export function FicheBar({ affectationId, version }: { affectationId: string; ve
             </div>
             <div className="fiche-row">
               <button type="button" className="btn primary" onClick={() => void run(() => downloadPdf(fiche))}>{t("Exporter en PDF")}</button>
-              {fiche.a_fichier_signe && (
-                <button type="button" className="btn ghost" onClick={() => void run(() => openScan(fiche))}>{t("Voir le scan signé")}</button>
-              )}
               <Link className="btn ghost" to="/assets/materiel/attributions">{t("Ouvrir dans Attributions")}</Link>
             </div>
           </div>

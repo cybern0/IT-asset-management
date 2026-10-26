@@ -249,55 +249,60 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
 async def test_attribution_workflow(client):
     agent = await make_agent(client, "M9")
     m = await make_materiel(client, "ORD-9", caracteristiques="RAM: 16 Go, Stockage: 512 Go, OS: Windows 11")
+    step = lambda f, body=None, code=200: post(client, f"/attributions/{f['id']}/avancer", body or {}, code)  # noqa: E731
 
-    # etape 1 : demande, puis validation du manager
+    # etape 1 : demande, puis validation du manager (geste humain : on enregistre qu'elle a eu lieu)
     f = await post(client, "/attributions", {"agent_id": agent["id"], "besoin": "PC portable", "canal": "TICKET"})
     assert f["etape"] == 1 and f["etat"] == "EN_COURS" and f["reference"].startswith("FD-")
-    r = await client.post(f"/attributions/{f['id']}/selectionner", json={"materiel_id": m["id"]})
-    assert r.status_code == 409  # pas encore validee
-    f = await post(client, f"/attributions/{f['id']}/valider", {"valide_par": "Mme Rabe"}, 200)
-    assert f["etape"] == 2
+    r = await client.post(f"/attributions/{f['id']}/avancer", json={})
+    assert r.status_code == 422 and r.json()["field"] == "valide_par"  # le manager doit etre nomme
+    f = await step(f, {"valide_par": "Mme Rabe"})
+    assert f["etape"] == 2 and f["valide_par"] == "Mme Rabe"
 
     # etapes 2-3 : equipement choisi, fiche generee (PDF disponible)
-    f = await post(client, f"/attributions/{f['id']}/selectionner", {"materiel_id": m["id"]}, 200)
+    r = await client.post(f"/attributions/{f['id']}/avancer", json={})
+    assert r.status_code == 422 and r.json()["field"] == "materiel_id"
+    f = await step(f, {"materiel_id": m["id"]})
     assert f["etape"] == 4 and f["date_generation"] and f["materiel_code"] == "ORD-9"
     pdf = await client.get(f"/attributions/{f['id']}/pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
 
     # le materiel est reserve par ce dossier
     other = await post(client, "/attributions", {"agent_id": agent["id"], "valide_par": "Mme Rabe"})
-    r = await client.post(f"/attributions/{other['id']}/selectionner", json={"materiel_id": m["id"]})
+    r = await client.post(f"/attributions/{other['id']}/avancer", json={"materiel_id": m["id"]})
     assert r.status_code == 409 and r.json()["field"] == "materiel_id"
 
-    # etape 5 impossible tant que la fiche n'est pas signee
-    assert (await client.post(f"/attributions/{f['id']}/remettre", json={})).status_code == 409
-    r = await client.post(f"/attributions/{f['id']}/signer", data={"mode_signature": "MANUSCRITE", "date_signature": "2000-01-01"})
-    assert r.status_code == 422 and r.json()["field"] == "date_signature"
-    r = await client.post(
-        f"/attributions/{f['id']}/signer", data={"mode_signature": "ELECTRONIQUE", "signe_par": "Resp. Info"}
-    )
-    assert r.status_code == 200 and r.json()["statut"] == "SIGNEE" and r.json()["etape"] == 5
+    # etape 4 : signature enregistree (papier par defaut) ; on peut la defaire puis la refaire
+    f = await step(f, {"signe_par": "Resp. Info"})
+    assert f["statut"] == "SIGNEE" and f["mode_signature"] == "MANUSCRITE" and f["etape"] == 5
+    f = await post(client, f"/attributions/{f['id']}/reculer", {})
+    assert f["statut"] == "NON_SIGNEE" and f["date_signature"] is None and f["etape"] == 4
+    f = await step(f, {"mode_signature": "ELECTRONIQUE", "signe_par": "Resp. Info"})
+    assert f["mode_signature"] == "ELECTRONIQUE" and f["etape"] == 5
 
     # etapes 5-6 : remise -> affectation creee, materiel « Attribue »
-    f = await post(
-        client, f"/attributions/{f['id']}/remettre",
-        {"etat_constate": "BON", "accessoires": ["Chargeur", "Souris"], "accessoires_autre": "Casque"}, 200,
-    )
+    f = await step(f, {"etat_constate": "BON", "accessoires": ["Chargeur", "Souris"], "accessoires_autre": "Casque"})
     assert f["etape"] == 6 and f["etat"] == "ATTRIBUEE" and f["affectation_id"]
     assert f["accessoires"] == ["Chargeur", "Souris"]
     assert (await client.get(f"/materiels/{m['id']}")).json()["statut"] == "ATTRIBUE"
     assert len((await client.get("/affectations")).json()) == 1  # une seule affectation, pas de doublon
 
-    # fiche signee : l'affectation ne peut pas etre supprimee
+    # dossier termine : plus d'avancement ni de retour en arriere, et la fiche signee protege l'affectation
+    assert (await client.post(f"/attributions/{f['id']}/avancer", json={})).status_code == 409
+    assert (await client.post(f"/attributions/{f['id']}/reculer")).status_code == 409
     assert (await client.delete(f"/affectations/{f['affectation_id']}")).status_code == 409
 
 
 async def test_attribution_refus_et_regularisation(client):
     agent = await make_agent(client, "M8")
     f = await post(client, "/attributions", {"agent_id": agent["id"]})
-    r = await client.post(f"/attributions/{f['id']}/refuser", json={"motif": "Pas de budget"})
-    assert r.json()["etat"] == "REFUSEE"
-    assert (await client.post(f"/attributions/{f['id']}/valider", json={"valide_par": "X"})).status_code == 409
+    r = await client.post(f"/attributions/{f['id']}/clore", json={"motif": "Pas de budget"})
+    assert r.json()["etat"] == "REFUSEE"  # refuse : le manager n'avait pas valide
+    assert (await client.post(f"/attributions/{f['id']}/avancer", json={"valide_par": "X"})).status_code == 409
+
+    # apres validation, la cloture devient une annulation
+    g = await post(client, "/attributions", {"agent_id": agent["id"], "valide_par": "X"})
+    assert (await client.post(f"/attributions/{g['id']}/clore", json={})).json()["etat"] == "ANNULEE"
 
     # affectation saisie directement : un dossier de regularisation est cree
     m = await make_materiel(client, "ORD-8")

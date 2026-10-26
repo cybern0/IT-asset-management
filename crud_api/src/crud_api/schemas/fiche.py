@@ -22,22 +22,21 @@ class AttributionCreate(BaseModel):
     valide_par: OptS(150) = None  # renseigne si le manager a deja valide
 
 
-class ValidationIn(BaseModel):
-    valide_par: S(150)
-    date_validation: OptDate = None
-
-
 class MotifIn(BaseModel):
     motif: OptText = None
 
 
-class SelectionIn(BaseModel):
-    materiel_id: int
+class AvancerIn(BaseModel):
+    """Etape suivante du dossier. La signature, la validation et la remise se font hors de l'application :
+    on se contente d'enregistrer qu'elles ont eu lieu. Seules les informations de l'etape en cours sont lues,
+    toutes sont facultatives sauf celles que l'etape exige (voir fiche_service.advance)."""
 
-
-class RemiseIn(BaseModel):
-    date_remise: OptDate = None
-    etat_constate: Literal["NEUF", "BON", "A_REPARER"] | None = None
+    date: OptDate = None  # date de l'etape (validation, signature ou remise) ; defaut : aujourd'hui
+    valide_par: OptS(150) = None  # etape 1 : manager qui a valide
+    materiel_id: int | None = None  # etape 2 : equipement choisi en stock
+    mode_signature: Literal["MANUSCRITE", "ELECTRONIQUE"] | None = None  # etape 4 (defaut : manuscrite)
+    signe_par: OptS(150) = None  # etape 4 : responsable signataire
+    etat_constate: Literal["NEUF", "BON", "A_REPARER"] | None = None  # etape 5 : controle visuel
     accessoires: list[Literal["Chargeur", "Sacoche", "Docking", "Souris", "Clavier"]] = []
     accessoires_autre: OptS(100) = None
     observations: OptText = None
@@ -69,7 +68,6 @@ class AttributionOut(ORMModel):
     date_signature: date | None
     mode_signature: str | None
     signe_par: str | None
-    a_fichier_signe: bool
     # etape 5
     date_remise: date | None
     etat_constate: str | None

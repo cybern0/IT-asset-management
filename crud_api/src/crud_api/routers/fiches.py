@@ -1,14 +1,12 @@
-# Fiches de detention (liste croisee, PDF, signature) et image du materiel
-from datetime import date
-
-from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
+# Dossiers d'attribution (fiches de detention : etapes, PDF) et image du materiel
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.config import get_settings
 from crud_api.core.database import get_db
-from crud_api.core.errors import ConflictError, NotFoundError, UnprocessableError
-from crud_api.schemas.fiche import AttributionCreate, AttributionOut, MotifIn, RemiseIn, SelectionIn, ValidationIn
+from crud_api.core.errors import ConflictError, NotFoundError
+from crud_api.schemas.fiche import AttributionCreate, AttributionOut, AvancerIn, MotifIn
 from crud_api.schemas.materiel import MaterielOut
 from crud_api.services import audit_service, fiche_pdf, fiche_service, file_store
 from crud_api.services.materiel_service import materiel_service
@@ -41,59 +39,23 @@ async def attribution_of_affectation(affectation_id: int, db: AsyncSession = Dep
     return await fiche_service.get_by_affectation(db, affectation_id)
 
 
-@router.post("/attributions/{fiche_id}/valider", response_model=AttributionOut, tags=TAG)
-async def validate_request(fiche_id: int, data: ValidationIn, db: AsyncSession = Depends(get_db)):
-    """Etape 1 : validation par le manager."""
-    return await fiche_service.validate(db, fiche_id, data.valide_par, data.date_validation)
+@router.post("/attributions/{fiche_id}/avancer", response_model=AttributionOut, tags=TAG)
+async def advance_attribution(fiche_id: int, data: AvancerIn, db: AsyncSession = Depends(get_db)):
+    """L'etape en cours est faite (validation du manager, equipement choisi, signature ou remise) : etape suivante.
+    A la remise, l'affectation est creee et le materiel passe a « Attribue »."""
+    return await fiche_service.advance(db, fiche_id, data)
 
 
-@router.post("/attributions/{fiche_id}/refuser", response_model=AttributionOut, tags=TAG)
-async def refuse_request(fiche_id: int, data: MotifIn, db: AsyncSession = Depends(get_db)):
-    return await fiche_service.refuse(db, fiche_id, data.motif)
+@router.post("/attributions/{fiche_id}/reculer", response_model=AttributionOut, tags=TAG)
+async def back_attribution(fiche_id: int, db: AsyncSession = Depends(get_db)):
+    """Defait la derniere etape faite."""
+    return await fiche_service.back(db, fiche_id)
 
 
-@router.post("/attributions/{fiche_id}/annuler", response_model=AttributionOut, tags=TAG)
-async def cancel_attribution(fiche_id: int, data: MotifIn, db: AsyncSession = Depends(get_db)):
-    return await fiche_service.cancel(db, fiche_id, data.motif)
-
-
-@router.post("/attributions/{fiche_id}/selectionner", response_model=AttributionOut, tags=TAG)
-async def select_equipment(fiche_id: int, data: SelectionIn, db: AsyncSession = Depends(get_db)):
-    """Etapes 2 et 3 : choix de l'equipement en stock ; la fiche est generee automatiquement."""
-    return await fiche_service.select_equipment(db, fiche_id, data.materiel_id)
-
-
-@router.post("/attributions/{fiche_id}/signer", response_model=AttributionOut, tags=TAG)
-async def sign_fiche(
-    fiche_id: int,
-    mode_signature: str = Form(...),
-    date_signature: str | None = Form(None),
-    signe_par: str | None = Form(None),
-    fichier: UploadFile | None = File(None),
-    db: AsyncSession = Depends(get_db),
-):
-    """Etape 4 : signature (date du jour par defaut) ; scan du document signe facultatif."""
-    signed_on = None
-    if date_signature and date_signature.strip():
-        try:
-            signed_on = date.fromisoformat(date_signature.strip())
-        except ValueError as exc:
-            raise UnprocessableError("Date invalide (AAAA-MM-JJ).", field="date_signature") from exc
-    return await fiche_service.sign(
-        db, fiche_id, signed_on, mode_signature.strip().upper(), (signe_par or "").strip() or None,
-        fichier if fichier and fichier.filename else None,
-    )
-
-
-@router.post("/attributions/{fiche_id}/annuler-signature", response_model=AttributionOut, tags=TAG)
-async def unsign_fiche(fiche_id: int, db: AsyncSession = Depends(get_db)):
-    return await fiche_service.unsign(db, fiche_id)
-
-
-@router.post("/attributions/{fiche_id}/remettre", response_model=AttributionOut, tags=TAG)
-async def hand_over(fiche_id: int, data: RemiseIn, db: AsyncSession = Depends(get_db)):
-    """Etapes 5 et 6 : remise physique, puis le materiel passe a « Attribue » (affectation creee)."""
-    return await fiche_service.hand_over(db, fiche_id, data)
+@router.post("/attributions/{fiche_id}/clore", response_model=AttributionOut, tags=TAG)
+async def close_attribution(fiche_id: int, data: MotifIn, db: AsyncSession = Depends(get_db)):
+    """Refuse la demande (avant validation) ou annule le dossier (apres)."""
+    return await fiche_service.close(db, fiche_id, data.motif)
 
 
 @router.get("/attributions/{fiche_id}/pdf", tags=TAG)
@@ -106,12 +68,6 @@ async def fiche_pdf_file(fiche_id: int, db: AsyncSession = Depends(get_db)):
         pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{d["reference"]}.pdf"'},
     )
-
-
-@router.get("/attributions/{fiche_id}/fichier-signe", tags=TAG)
-async def signed_scan(fiche_id: int, db: AsyncSession = Depends(get_db)):
-    rel = await fiche_service.scan_path(db, fiche_id)
-    return FileResponse(file_store.path_of(rel), media_type=file_store.media_type(rel))
 
 
 # ----------------------------- image du materiel -----------------------------

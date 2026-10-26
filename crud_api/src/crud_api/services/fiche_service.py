@@ -2,20 +2,22 @@
 #   1 demande + validation du manager   2 selection d'un equipement en stock
 #   3 generation de la fiche (automatique des la selection)
 #   4 signature                         5 remise physique -> 6 materiel « Attribue » (affectation)
+#
+# Les etapes 1, 4 et 5 sont des gestes humains (validation, signature, remise) qui se font hors de l'application :
+# elle se contente d'enregistrer qu'ils ont eu lieu. D'ou trois actions seulement : avancer (l'etape en cours est faite),
+# reculer (on defait la derniere etape), clore (refus ou annulation). L'etape en cours est deduite des donnees.
 from datetime import date
 from typing import Any
 
-from fastapi import UploadFile
 from sqlalchemy import Integer, cast, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crud_api.config import get_settings
 from crud_api.core.errors import ConflictError, NotFoundError, UnprocessableError
 from crud_api.models import (
     Affectation, Agent, CategorieMateriel, Direction, FicheDetention, Materiel, Service, Utilisateur,
 )
-from crud_api.schemas.fiche import ACCESSOIRES, AttributionCreate, RemiseIn
-from crud_api.services import audit_service, file_store
+from crud_api.schemas.fiche import ACCESSOIRES, AttributionCreate, AvancerIn
+from crud_api.services import audit_service
 
 _LOCK_KEY = 7240011  # verrou applicatif : numerotation sans doublon
 REGULARISATION = "Régularisation"
@@ -66,7 +68,7 @@ def _flat(row) -> dict[str, Any]:
         "date_demande": f.date_demande, "valide_par": f.valide_par, "date_validation": f.date_validation,
         "date_generation": f.date_generation,
         "statut": f.statut, "date_signature": f.date_signature, "mode_signature": f.mode_signature,
-        "signe_par": f.signe_par, "a_fichier_signe": bool(f.fichier_signe_chemin),
+        "signe_par": f.signe_par,
         "date_remise": f.date_remise, "etat_constate": f.etat_constate,
         "accessoires": [x for x in (f.accessoires or "").split(",") if x],
         "accessoires_autre": f.accessoires_autre, "observations_remise": f.observations_remise,
@@ -131,7 +133,8 @@ def _open(f: FicheDetention) -> None:
 
 
 async def _next_reference(db: AsyncSession) -> str:
-    await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _LOCK_KEY})
+    if db.get_bind().dialect.name == "postgresql":
+        await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _LOCK_KEY})
     prefix = f"FD-{date.today().year}-"
     last = await db.scalar(
         select(func.max(cast(func.substr(FicheDetention.reference, len(prefix) + 1), Integer))).where(
@@ -167,44 +170,11 @@ async def create_request(db: AsyncSession, data: AttributionCreate) -> dict[str,
     return await _done(db, fiche, "CREATE", {"reference": fiche.reference})
 
 
-async def validate(db: AsyncSession, fiche_id: int, valide_par: str, on: date | None) -> dict[str, Any]:
-    f = await _fiche(db, fiche_id)
-    _open(f)
-    if f.valide_par:
-        raise ConflictError("Cette demande est déjà validée.")
-    on = on or date.today()
-    if on < f.date_demande:
-        raise UnprocessableError("La validation ne peut pas précéder la demande.", field="date_validation")
-    f.valide_par, f.date_validation = valide_par, on
-    return await _done(db, f, "VALIDATE", {"valide_par": valide_par})
-
-
-async def refuse(db: AsyncSession, fiche_id: int, motif: str | None) -> dict[str, Any]:
-    f = await _fiche(db, fiche_id)
-    _open(f)
-    if f.valide_par:
-        raise ConflictError("Cette demande est déjà validée : utilisez « Annuler le dossier ».")
-    f.cloture, f.motif_cloture = "REFUSEE", motif
-    return await _done(db, f, "REFUSE", {"motif": motif})
-
-
-async def cancel(db: AsyncSession, fiche_id: int, motif: str | None) -> dict[str, Any]:
-    f = await _fiche(db, fiche_id)
-    _open(f)
-    f.cloture, f.motif_cloture = "ANNULEE", motif
-    return await _done(db, f, "CANCEL", {"motif": motif})
-
-
-# ----------------------------- etapes 2-3 : selection + fiche -----------------------------
-async def select_equipment(db: AsyncSession, fiche_id: int, materiel_id: int) -> dict[str, Any]:
-    f = await _fiche(db, fiche_id)
-    _open(f)
-    if not f.valide_par:
-        raise ConflictError("La demande doit d’abord être validée par le manager (étape 1).")
-    if f.materiel_id == materiel_id:
-        return await get_detention(db, fiche_id)
-    if f.statut == "SIGNEE":
-        raise ConflictError("La fiche est signée : annulez la signature avant de changer d’équipement.")
+# ----------------------------- etape suivante / etape precedente / cloture -----------------------------
+async def _reserve(db: AsyncSession, f: FicheDetention, materiel_id: int | None) -> None:
+    """Etape 2 : l'equipement doit etre en stock et ne pas etre reserve par un autre dossier ouvert."""
+    if materiel_id is None:
+        raise UnprocessableError("Choisissez l’équipement à attribuer.", field="materiel_id")
     m = await db.get(Materiel, materiel_id)
     if m is None:
         raise UnprocessableError("Matériel introuvable.", field="materiel_id")
@@ -218,80 +188,45 @@ async def select_equipment(db: AsyncSession, fiche_id: int, materiel_id: int) ->
     )
     if other:
         raise ConflictError(f"Ce matériel est déjà réservé par le dossier {other}.", field="materiel_id")
-    f.materiel_id = materiel_id
-    f.date_generation = date.today()  # etape 3 : la fiche est generee automatiquement
-    return await _done(db, f, "SELECT_EQUIPMENT", {"materiel_id": materiel_id})
 
 
-# ----------------------------- etape 4 : signature -----------------------------
-async def sign(
-    db: AsyncSession, fiche_id: int, signed_on: date | None, mode: str, signe_par: str | None, scan: UploadFile | None
-) -> dict[str, Any]:
+async def advance(db: AsyncSession, fiche_id: int, data: AvancerIn) -> dict[str, Any]:
+    """L'etape en cours est faite : on l'enregistre et le dossier passe a la suivante."""
     f = await _fiche(db, fiche_id)
-    _not_closed(f)
-    if f.materiel_id is None:
-        raise ConflictError("Sélectionnez d’abord un équipement (étape 2) : la fiche n’est pas encore générée.")
-    if mode not in ("MANUSCRITE", "ELECTRONIQUE"):
-        raise UnprocessableError("Mode de signature invalide.", field="mode_signature")
-    signed_on = signed_on or date.today()
-    if signed_on < f.date_demande:
-        raise UnprocessableError("La signature ne peut pas précéder la demande.", field="date_signature")
+    _open(f)
+    step, on = etape_of(f), data.date or date.today()
 
-    old_scan = f.fichier_signe_chemin
-    if scan is not None:
-        f.fichier_signe_chemin = await file_store.save(
-            scan, "fiches", f.reference, file_store.SCAN_TYPES, get_settings().max_scan_mb
-        )
-    f.statut, f.date_signature, f.mode_signature, f.signe_par = "SIGNEE", signed_on, mode, signe_par
-    out = await _done(db, f, "SIGN", {"date_signature": signed_on.isoformat(), "mode": mode, "scan": scan is not None})
-    if scan is not None:
-        file_store.remove(old_scan)
-    return out
+    if step == 1:  # le manager a valide la demande
+        if not data.valide_par:
+            raise UnprocessableError("Indiquez le manager qui a validé la demande.", field="valide_par")
+        f.valide_par, f.date_validation = data.valide_par, on
+        return await _done(db, f, "VALIDATE", {"valide_par": data.valide_par})
 
+    if step == 2:  # equipement choisi : la fiche est generee (etape 3, automatique)
+        await _reserve(db, f, data.materiel_id)
+        f.materiel_id, f.date_generation = data.materiel_id, date.today()
+        return await _done(db, f, "SELECT_EQUIPMENT", {"materiel_id": data.materiel_id})
 
-async def unsign(db: AsyncSession, fiche_id: int) -> dict[str, Any]:
-    f = await _fiche(db, fiche_id)
-    _not_closed(f)
-    if f.statut != "SIGNEE":
-        raise ConflictError("Cette fiche n’est pas signée.")
-    old_scan = f.fichier_signe_chemin
-    f.statut, f.date_signature, f.mode_signature, f.signe_par, f.fichier_signe_chemin = (
-        "NON_SIGNEE", None, None, None, None,
-    )
-    out = await _done(db, f, "UNSIGN")
-    file_store.remove(old_scan)
-    return out
+    if step == 4:  # la fiche a ete signee (papier ou electronique)
+        f.statut, f.date_signature = "SIGNEE", on
+        f.mode_signature, f.signe_par = data.mode_signature or "MANUSCRITE", data.signe_par
+        return await _done(db, f, "SIGN", {"date_signature": on.isoformat(), "mode": f.mode_signature})
+
+    return await _hand_over(db, f, data, on)  # etape 5 : le materiel a ete remis
 
 
-async def scan_path(db: AsyncSession, fiche_id: int) -> str:
-    f = await _fiche(db, fiche_id)
-    if not f.fichier_signe_chemin:
-        raise NotFoundError("Aucun scan enregistré pour cette fiche.")
-    return f.fichier_signe_chemin
-
-
-# ----------------------------- etapes 5-6 : remise + attribution -----------------------------
-async def hand_over(db: AsyncSession, fiche_id: int, data: RemiseIn) -> dict[str, Any]:
+async def _hand_over(db: AsyncSession, f: FicheDetention, data: AvancerIn, remise: date) -> dict[str, Any]:
+    """Etapes 5 et 6 : remise enregistree, puis creation de l'affectation (materiel « Attribue »)."""
     from crud_api.schemas.materiel import AffectationCreate  # import tardif : evite le cycle de modules
     from crud_api.services.materiel_service import affectation_service
 
-    f = await _fiche(db, fiche_id)
-    _open(f)
-    if f.materiel_id is None:
-        raise ConflictError("Sélectionnez d’abord un équipement (étape 2).")
-    if f.statut != "SIGNEE":
-        raise ConflictError("La fiche doit être signée avant la remise du matériel (étape 4).")
-    remise = data.date_remise or date.today()
-    if f.date_signature and remise < f.date_signature:
-        raise UnprocessableError("La remise ne peut pas précéder la signature.", field="date_remise")
     m = await db.get(Materiel, f.materiel_id)
     etat = data.etat_constate or (m.etat if m and m.etat in ("NEUF", "BON", "A_REPARER") else "BON")
-
     f.date_remise, f.etat_constate = remise, etat
     f.accessoires = ",".join(a for a in ACCESSOIRES if a in data.accessoires) or None
     f.accessoires_autre, f.observations_remise = data.accessoires_autre, data.observations
     await db.flush()
-    # etape 6 : l'affectation passe le materiel a « Attribue » ; son hook rattache cette fiche
+    # l'affectation passe le materiel a « Attribue » ; son hook rattache ce dossier
     await affectation_service.create(
         db,
         AffectationCreate(
@@ -299,7 +234,35 @@ async def hand_over(db: AsyncSession, fiche_id: int, data: RemiseIn) -> dict[str
             observations=data.observations,
         ),
     )
-    return await get_detention(db, fiche_id)
+    return await get_detention(db, f.id)
+
+
+async def back(db: AsyncSession, fiche_id: int) -> dict[str, Any]:
+    """On defait la derniere etape faite (erreur de saisie, signature a refaire, autre equipement...)."""
+    f = await _fiche(db, fiche_id)
+    _not_closed(f)
+    if f.affectation_id:
+        raise ConflictError("Le matériel est déjà attribué : enregistrez son retour dans Affectations.")
+    step = etape_of(f)
+    if step == 1:
+        raise ConflictError("Ce dossier est déjà à la première étape.")
+    if step == 2:
+        f.valide_par = f.date_validation = None
+        return await _done(db, f, "UNVALIDATE")
+    if step == 4:  # on retire l'equipement : il redevient libre pour un autre dossier
+        f.materiel_id = f.date_generation = None
+        return await _done(db, f, "UNSELECT_EQUIPMENT")
+    f.statut, f.date_signature, f.mode_signature, f.signe_par = "NON_SIGNEE", None, None, None  # etape 5
+    return await _done(db, f, "UNSIGN")
+
+
+async def close(db: AsyncSession, fiche_id: int, motif: str | None) -> dict[str, Any]:
+    """Fin du dossier avant l'attribution : refuse tant que le manager n'a pas valide, annule ensuite."""
+    f = await _fiche(db, fiche_id)
+    _open(f)
+    f.cloture = "ANNULEE" if f.valide_par else "REFUSEE"
+    f.motif_cloture = motif
+    return await _done(db, f, "CANCEL" if f.valide_par else "REFUSE", {"motif": motif})
 
 
 # ----------------------------- lien avec les affectations -----------------------------

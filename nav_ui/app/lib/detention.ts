@@ -9,7 +9,7 @@ export type Attribution = {
   date_demande: string; valide_par: string | null; date_validation: string | null;
   date_generation: string | null;
   statut: "NON_SIGNEE" | "SIGNEE"; date_signature: string | null; mode_signature: "MANUSCRITE" | "ELECTRONIQUE" | null;
-  signe_par: string | null; a_fichier_signe: boolean;
+  signe_par: string | null;
   date_remise: string | null; etat_constate: string | null; accessoires: string[];
   accessoires_autre: string | null; observations_remise: string | null;
   affectation_id: number | null; date_retour: string | null; etat_retour: string | null;
@@ -82,11 +82,3 @@ export function saveBlob(blob: Blob, filename: string): void {
 
 export const downloadPdf = async (f: Pick<Attribution, "id" | "reference">) =>
   saveBlob(await api.blob(`/attributions/${f.id}/pdf`), `${f.reference}.pdf`);
-
-/** Ouvre le scan de la fiche signee dans un nouvel onglet (image ou PDF). */
-export async function openScan(f: Pick<Attribution, "id">): Promise<void> {
-  const blob = await api.blob(`/attributions/${f.id}/fichier-signe`);
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank", "noopener");
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}

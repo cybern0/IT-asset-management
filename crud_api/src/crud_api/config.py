@@ -36,7 +36,6 @@ class Settings(BaseSettings):
     # Fichiers envoyes (relatif au dossier de lancement, ou chemin absolu)
     upload_dir: str = "uploads"
     max_image_mb: int = 5
-    max_scan_mb: int = 10
 
     # Nom de la structure imprime sur les fiches de detention (PDF)
     structure_name: str = ""

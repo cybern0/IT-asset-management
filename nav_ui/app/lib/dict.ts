@@ -301,9 +301,7 @@ const A: [string, string, string][] = [
   ["Modifier la signature", "Edit signature", "Hanova ny sonia"],
   ["Annuler la signature", "Cancel signature", "Foano ny sonia"],
   ["Enregistrer la signature", "Save signature", "Tehirizo ny sonia"],
-  ["Voir le scan signé", "View signed scan", "Jereo ny scan voasonia"],
   ["Date de signature", "Signature date", "Daty nanaovana sonia"],
-  ["Scan du document signé (facultatif)", "Scan of the signed document (optional)", "Scan ny taratasy voasonia (tsy voatery)"],
   ["Signée", "Signed", "Voasonia"],
   ["Non signée", "Not signed", "Tsy voasonia"],
   ["le {d}", "on {d}", "tamin'ny {d}"],
@@ -381,7 +379,6 @@ const A: [string, string, string][] = [
   ["Électronique", "Electronic", "Elektronika"],
   ["Mode de signature", "Signature mode", "Karazana sonia"],
   ["Responsable signataire (informatique ou hiérarchique)", "Signing manager (IT or hierarchical)", "Mpanao sonia (informatika na mpanamory)"],
-  ["Imprimez la fiche (Exporter en PDF), faites-la signer par le détenteur et le responsable, puis enregistrez la signature.", "Print the sheet (Export as PDF), have it signed by the holder and the manager, then record the signature.", "Alefaso ny taratasy (Avoahy PDF), asao sonian'ny mpitazona sy ny tompon'andraikitra, dia tehirizo ny sonia."],
   ["Remis le {d}", "Handed over on {d}", "Natolotra tamin'ny {d}"],
   ["État constaté", "Observed condition", "Toetry ny fitaovana hita"],
   ["État constaté (contrôle visuel)", "Observed condition (visual check)", "Toetry ny fitaovana hita (fanaraha-maso)"],
@@ -392,7 +389,6 @@ const A: [string, string, string][] = [
   ["Souris", "Mouse", "Totozy"],
   ["Clavier", "Keyboard", "Fanindriana"],
   ["Autre accessoire", "Other accessory", "Kojakoja hafa"],
-  ["En confirmant, le matériel passe au statut « Attribué » et la fiche signée est archivée.", "By confirming, the equipment becomes “Assigned” and the signed sheet is archived.", "Rehefa ekena, lasa « Voatendry » ny fitaovana ary voatahiry ny taratasy voasonia."],
   ["Confirmer la remise du matériel", "Confirm equipment handover", "Ekeo ny fanomezana ny fitaovana"],
   ["Matériel au statut « Attribué » (affectation n° {n}). La fiche signée est archivée.", "Equipment is “Assigned” (assignment no. {n}). The signed sheet is archived.", "Voatendry ny fitaovana (fanendrena laharana {n}). Voatahiry ny taratasy voasonia."],
   ["Rendu le {d}.", "Returned on {d}.", "Naverina tamin'ny {d}."],
@@ -415,6 +411,10 @@ const A: [string, string, string][] = [
   ["Tableau de bord", "Dashboard", "Tabilao fanaraha-maso"],
   // --- tableau de bord (indicateurs, tableaux, alertes, graphiques)
   // --- fiche de détention (demande, signature, remise, restitution)
+  // --- circuit d’attribution simplifié (aucun scan)
+  ["Annuler la validation", "Cancel the approval", "Foano ny fankatoavana"],
+  ["Imprimez la fiche (Exporter en PDF) et faites-la signer par le détenteur et le responsable. Une fois signée, enregistrez ici que la signature a eu lieu : aucun scan n’est demandé.", "Print the sheet (Export to PDF) and have the holder and the manager sign it. Once signed, record here that the signature took place: no scan is required.", "Alefaso soratra ny taratasy (Alefaso amin'ny PDF) ary asaivo manao sonia ny mpitazona sy ny tompon'andraikitra. Rehefa voasonia, soraty eto fa vita ny sonia: tsy ilaina ny scan."],
+  ["En confirmant, le matériel passe au statut « Attribué ». Pensez à archiver la fiche signée (papier ou PDF).", "By confirming, the equipment is set to “Assigned”. Remember to archive the signed sheet (paper or PDF).", "Rehefa ekena, lasa « Voatendry » ny fitaovana. Aza adino ny mitahiry ny taratasy voasonia (taratasy na PDF)."],
   ["Suivi du dossier", "File tracking", "Fanaraha-maso ny antontan-taratasy"],
   ["Interrompu", "Interrupted", "Tapaka"],
   ["À faire", "To do", "Tokony hatao"],

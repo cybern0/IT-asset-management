@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import {
-  ACCESSOIRES, agentName, CANAL_LABEL, downloadPdf, ETAPES, ETAT_LABEL, fmtDate, openScan, type Attribution,
+  ACCESSOIRES, agentName, CANAL_LABEL, downloadPdf, ETAPES, ETAT_LABEL, fmtDate, MODE_LABEL, type Attribution,
 } from "../lib/detention";
 import { useI18n } from "../lib/i18n";
 import { tone } from "../lib/schema";
@@ -12,20 +12,25 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").to
 
 type StepState = "done" | "current" | "todo";
 
-/** Les 6 etapes du processus pour un dossier : resume des etapes faites + action de l'etape en cours. */
+// Libelle du bouton qui defait la derniere etape faite, selon l'etape en cours
+const UNDO_LABEL: Record<number, string> = { 2: "Annuler la validation", 4: "Changer d’équipement", 5: "Annuler la signature" };
+
+/**
+ * Les 6 etapes du processus pour un dossier. La validation, la signature et la remise sont des gestes humains faits
+ * hors de l'application : elle enregistre seulement qu'ils ont eu lieu. Trois actions : avancer, reculer, clore.
+ */
 export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f: Attribution) => void }) {
   const { t } = useI18n();
   const { refresh } = useStore();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [changing, setChanging] = useState(false); // etape 2 rouverte (changer d'equipement)
-  const [resign, setResign] = useState(false); // etape 4 rouverte (modifier la signature)
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
   const [motif, setMotif] = useState("");
 
   const closed = d.cloture !== null;
   const signed = d.statut === "SIGNEE";
   const attributed = d.affectation_id !== null;
+  const validated = d.valide_par !== null;
 
   async function run(action: () => Promise<Attribution | void>, after?: () => Promise<void>) {
     setBusy(true);
@@ -36,14 +41,14 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
       if (after) await after();
     } catch (e) {
       setError(e instanceof ApiError ? (e.network ? t("Impossible de joindre l’API.") : e.message) : t("Erreur inattendue."));
-    } finally { setBusy(false); setConfirmCancel(false); }
+    } finally { setBusy(false); setConfirmClose(false); }
   }
   const post = (path: string, body: unknown = {}) =>
     api.create(`attributions/${d.id}/${path}`, body as never) as unknown as Promise<Attribution>;
+  const advance = (body: unknown, after?: () => Promise<void>) => run(() => post("avancer", body), after);
 
   const done: Record<number, boolean> = {
-    1: d.valide_par !== null, 2: d.materiel_id !== null, 3: d.date_generation !== null,
-    4: signed, 5: attributed, 6: attributed,
+    1: validated, 2: d.materiel_id !== null, 3: d.date_generation !== null, 4: signed, 5: attributed, 6: attributed,
   };
   const stateOf = (n: number): StepState => (done[n] ? "done" : !closed && n === d.etape ? "current" : "todo");
 
@@ -83,8 +88,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                       <dd>{t(CANAL_LABEL[d.canal])}{d.reference_canal ? ` · ${d.reference_canal}` : ""}{d.demandeur ? ` · ${d.demandeur}` : ""} · {fmtDate(d.date_demande)}</dd>
                       {d.valide_par && <><dt>{t("Validée par")}</dt><dd>{d.valide_par} · {fmtDate(d.date_validation)}</dd></>}
                     </dl>
-                    {st === "current" && <ValidateForm busy={busy} onValidate={(v) => run(() => post("valider", v))}
-                      onRefuse={(m) => run(() => post("refuser", { motif: m }))} />}
+                    {st === "current" && <ValidateForm busy={busy} onValidate={(v) => advance(v)} />}
                   </>
                 )}
 
@@ -94,17 +98,9 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                       <p className="step-sum">
                         <strong>{d.materiel_designation}</strong> · {d.materiel_code}
                         {d.materiel_serie ? ` · ${t("N° de série")} ${d.materiel_serie}` : ""}
-                        {!attributed && !signed && !closed && !changing && (
-                          <button type="button" className="btn ghost small" disabled={busy} onClick={() => setChanging(true)}>{t("Changer d’équipement")}</button>
-                        )}
                       </p>
                     )}
-                    {((st === "current") || changing) && !closed && (
-                      <EquipmentPicker
-                        d={d} busy={busy}
-                        onPick={(id) => run(() => post("selectionner", { materiel_id: id }), async () => setChanging(false))}
-                      />
-                    )}
+                    {st === "current" && <EquipmentPicker d={d} busy={busy} onPick={(id) => advance({ materiel_id: id })} />}
                   </>
                 )}
 
@@ -119,24 +115,14 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
 
                 {s.n === 4 && (
                   <>
-                    {signed && !resign && (
+                    {signed && (
                       <p className="step-sum">
                         {t("Signée le {d}", { d: fmtDate(d.date_signature) })}
-                        {d.mode_signature ? ` · ${t(d.mode_signature === "MANUSCRITE" ? "Manuscrite" : "Électronique")}` : ""}
+                        {d.mode_signature ? ` · ${t(MODE_LABEL[d.mode_signature])}` : ""}
                         {d.signe_par ? ` · ${d.signe_par}` : ""}
-                        {d.a_fichier_signe && (
-                          <button type="button" className="btn ghost small" disabled={busy} onClick={() => void run(() => openScan(d))}>{t("Voir le scan signé")}</button>
-                        )}
-                        {!closed && <button type="button" className="btn ghost small" disabled={busy} onClick={() => setResign(true)}>{t("Modifier la signature")}</button>}
-                        {!closed && !attributed && (
-                          <button type="button" className="btn ghost small" disabled={busy} onClick={() => void run(() => post("annuler-signature"))}>{t("Annuler la signature")}</button>
-                        )}
                       </p>
                     )}
-                    {!closed && d.materiel_id !== null && (!signed || resign) && (st === "current" || attributed || resign) && (
-                      <SignForm busy={busy} onCancel={resign ? () => setResign(false) : undefined}
-                        onSign={(form) => run(() => api.upload<Attribution>(`/attributions/${d.id}/signer`, form), async () => setResign(false))} />
-                    )}
+                    {st === "current" && <SignForm busy={busy} onSign={(v) => advance(v)} />}
                   </>
                 )}
 
@@ -150,7 +136,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                       </p>
                     )}
                     {st === "current" && <HandOverForm busy={busy} d={d} onSubmit={(body) =>
-                      run(() => post("remettre", body), () => refresh(["materiel", "affectation", "journal_audit"]))} />}
+                      advance(body, () => refresh(["materiel", "affectation", "journal_audit"]))} />}
                   </>
                 )}
 
@@ -168,14 +154,23 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
 
       {!closed && !attributed && (
         <div className="attrib-foot">
-          {confirmCancel ? (
+          {confirmClose ? (
             <>
               <input value={motif} onChange={(e) => setMotif(e.target.value)} placeholder={t("Motif (facultatif)")} aria-label={t("Motif (facultatif)")} />
-              <button type="button" className="btn danger" disabled={busy} onClick={() => void run(() => post("annuler", { motif }))}>{t("Confirmer l’annulation")}</button>
-              <button type="button" className="btn ghost" onClick={() => setConfirmCancel(false)}>{t("Retour")}</button>
+              <button type="button" className="btn danger" disabled={busy} onClick={() => void run(() => post("clore", { motif }))}>
+                {t(validated ? "Confirmer l’annulation" : "Confirmer le refus")}
+              </button>
+              <button type="button" className="btn ghost" onClick={() => setConfirmClose(false)}>{t("Retour")}</button>
             </>
           ) : (
-            <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirmCancel(true)}>{t("Annuler le dossier")}</button>
+            <>
+              {UNDO_LABEL[d.etape] && (
+                <button type="button" className="btn ghost" disabled={busy} onClick={() => void run(() => post("reculer"))}>{t(UNDO_LABEL[d.etape])}</button>
+              )}
+              <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirmClose(true)}>
+                {t(validated ? "Annuler le dossier" : "Refuser la demande")}
+              </button>
+            </>
           )}
         </div>
       )}
@@ -184,14 +179,10 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
   );
 }
 
-function ValidateForm({ busy, onValidate, onRefuse }: {
-  busy: boolean; onValidate: (v: { valide_par: string; date_validation: string }) => void; onRefuse: (motif: string) => void;
-}) {
+function ValidateForm({ busy, onValidate }: { busy: boolean; onValidate: (v: { valide_par: string; date: string }) => void }) {
   const { t } = useI18n();
   const [par, setPar] = useState("");
   const [date, setDate] = useState(today());
-  const [refusing, setRefusing] = useState(false);
-  const [motif, setMotif] = useState("");
   return (
     <div className="step-form">
       <label>{t("Validée par (manager)")}
@@ -201,17 +192,10 @@ function ValidateForm({ busy, onValidate, onRefuse }: {
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
       <div className="row">
-        <button type="button" className="btn primary" disabled={busy || !par.trim()} onClick={() => onValidate({ valide_par: par.trim(), date_validation: date })}>
+        <button type="button" className="btn primary" disabled={busy || !par.trim()} onClick={() => onValidate({ valide_par: par.trim(), date })}>
           {t("Valider la demande")}
         </button>
-        {!refusing && <button type="button" className="btn ghost" disabled={busy} onClick={() => setRefusing(true)}>{t("Refuser la demande")}</button>}
       </div>
-      {refusing && (
-        <div className="row">
-          <input value={motif} onChange={(e) => setMotif(e.target.value)} placeholder={t("Motif du refus")} aria-label={t("Motif du refus")} />
-          <button type="button" className="btn danger" disabled={busy} onClick={() => onRefuse(motif)}>{t("Confirmer le refus")}</button>
-        </div>
-      )}
     </div>
   );
 }
@@ -262,25 +246,14 @@ function EquipmentPicker({ d, busy, onPick }: { d: Attribution; busy: boolean; o
   );
 }
 
-function SignForm({ busy, onSign, onCancel }: { busy: boolean; onSign: (f: FormData) => void; onCancel?: () => void }) {
+function SignForm({ busy, onSign }: { busy: boolean; onSign: (v: { mode_signature: string; date: string; signe_par?: string }) => void }) {
   const { t } = useI18n();
   const [mode, setMode] = useState("MANUSCRITE");
   const [par, setPar] = useState("");
   const [date, setDate] = useState(today());
-  const [scan, setScan] = useState<File | null>(null);
-
-  function submit() {
-    const f = new FormData();
-    f.append("mode_signature", mode);
-    f.append("date_signature", date);
-    if (par.trim()) f.append("signe_par", par.trim());
-    if (scan) f.append("fichier", scan);
-    onSign(f);
-  }
-
   return (
     <div className="step-form">
-      <p className="hint">{t("Imprimez la fiche (Exporter en PDF), faites-la signer par le détenteur et le responsable, puis enregistrez la signature.")}</p>
+      <p className="hint">{t("Imprimez la fiche (Exporter en PDF) et faites-la signer par le détenteur et le responsable. Une fois signée, enregistrez ici que la signature a eu lieu : aucun scan n’est demandé.")}</p>
       <div className="row">
         <label>{t("Mode de signature")}
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
@@ -295,12 +268,11 @@ function SignForm({ busy, onSign, onCancel }: { busy: boolean; onSign: (f: FormD
       <label>{t("Responsable signataire (informatique ou hiérarchique)")}
         <input value={par} onChange={(e) => setPar(e.target.value)} />
       </label>
-      <label>{t("Scan du document signé (facultatif)")}
-        <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(e) => setScan(e.target.files?.[0] ?? null)} />
-      </label>
       <div className="row">
-        <button type="button" className="btn primary" disabled={busy || !date} onClick={submit}>{t("Enregistrer la signature")}</button>
-        {onCancel && <button type="button" className="btn ghost" onClick={onCancel}>{t("Annuler")}</button>}
+        <button type="button" className="btn primary" disabled={busy || !date}
+          onClick={() => onSign({ mode_signature: mode, date, ...(par.trim() ? { signe_par: par.trim() } : {}) })}>
+          {t("Enregistrer la signature")}
+        </button>
       </div>
     </div>
   );
@@ -341,9 +313,9 @@ function HandOverForm({ busy, d, onSubmit }: { busy: boolean; d: Attribution; on
       <label>{t("Observations")}
         <textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
       </label>
-      <p className="hint">{t("En confirmant, le matériel passe au statut « Attribué » et la fiche signée est archivée.")}</p>
+      <p className="hint">{t("En confirmant, le matériel passe au statut « Attribué ». Pensez à archiver la fiche signée (papier ou PDF).")}</p>
       <button type="button" className="btn primary" disabled={busy || !date}
-        onClick={() => onSubmit({ date_remise: date, etat_constate: etat, accessoires: acc, accessoires_autre: autre, observations: obs })}>
+        onClick={() => onSubmit({ date, etat_constate: etat, accessoires: acc, accessoires_autre: autre, observations: obs })}>
         {t("Confirmer la remise du matériel")}
       </button>
     </div>

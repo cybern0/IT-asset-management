@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import {
-  agentName, CANAL_LABEL, downloadPdf, ETAT_LABEL, ETAT_MATERIEL_LABEL, ficheLabel, fmtDate, MODE_LABEL, openScan,
+  agentName, CANAL_LABEL, downloadPdf, ETAT_LABEL, ETAT_MATERIEL_LABEL, ficheLabel, fmtDate, MODE_LABEL,
   PROVENANCE_LABEL, suivi, type Attribution as Detention,
 } from "../lib/detention";
 import { Icon } from "../lib/icons";
@@ -152,7 +152,6 @@ function DetentionDetail({ d }: { d: Detention }) {
           {d.etat === "EN_COURS" ? `${t("Étape")} ${d.etape}/6` : t(ETAT_LABEL[d.etat])}
         </span>
         <button type="button" className="btn primary" onClick={() => void downloadPdf(d)}>{t("Exporter en PDF")}</button>
-        {d.a_fichier_signe && <button type="button" className="btn ghost" onClick={() => void openScan(d)}>{t("Voir le scan signé")}</button>}
       </div>
 
       <section className="suivi" aria-label={t("Suivi du dossier")}>

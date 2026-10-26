@@ -1,4 +1,4 @@
-# Stockage des fichiers envoyes (images du materiel, scans des fiches signees)
+# Stockage des fichiers envoyes (images du materiel)
 import uuid
 from pathlib import Path
 
@@ -8,7 +8,6 @@ from crud_api.config import get_settings
 from crud_api.core.errors import NotFoundError, UnprocessableError
 
 IMAGE_TYPES = {"jpg", "png", "webp"}
-SCAN_TYPES = IMAGE_TYPES | {"pdf"}
 MIME = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "pdf": "application/pdf"}
 
 
