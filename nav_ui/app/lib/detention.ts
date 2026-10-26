@@ -18,6 +18,7 @@ export type Attribution = {
   materiel_categorie: string | null; materiel_marque: string | null; materiel_modele: string | null;
   materiel_serie: string | null; materiel_caracteristiques: string | null; materiel_etat: string | null;
   materiel_statut: string | null; materiel_localisation: string | null; materiel_a_image: boolean;
+  materiel_provenance: string | null; materiel_provenance_detail: string | null; materiel_date_acquisition: string | null;
   agent_id: number; agent_matricule: string; agent_nom: string; agent_prenom: string;
   agent_fonction: string | null; agent_email: string | null;
   service_nom: string | null; service_site: string | null; direction_nom: string | null;
@@ -44,6 +45,21 @@ export const ETAT_LABEL: Record<Attribution["etat"], string> = {
 };
 export const CANAL_LABEL: Record<Attribution["canal"], string> = { MAIL: "Mail", TICKET: "Ticket", FORMULAIRE: "Formulaire" };
 export const ACCESSOIRES = ["Chargeur", "Sacoche", "Docking", "Souris", "Clavier"] as const;
+
+export const MODE_LABEL: Record<string, string> = { MANUSCRITE: "Manuscrite", ELECTRONIQUE: "Électronique" };
+export const PROVENANCE_LABEL: Record<string, string> = {
+  ACHAT: "Achat", DOTATION: "Dotation", AFFECTATION: "Affectation", PROJET: "Projet", DON: "Don", AUTRE: "Autre",
+};
+export const ETAT_MATERIEL_LABEL: Record<string, string> = {
+  NEUF: "Neuf", BON: "Bon", A_REPARER: "À réparer", EN_PANNE: "En panne", REFORME: "Réformé",
+};
+
+/** Avancement du dossier : une ligne par etape du processus, avec sa date quand elle est faite. */
+export function suivi(d: Attribution): { n: number; title: string; date: string | null; done: boolean }[] {
+  const done = [!!d.valide_par, d.materiel_id !== null, !!d.date_generation, d.statut === "SIGNEE", !!d.date_remise, d.affectation_id !== null];
+  const date = [d.date_validation ?? d.date_demande, d.date_generation, d.date_generation, d.date_signature, d.date_remise, d.affectation_id ? d.date_remise : null];
+  return ETAPES.map((e, i) => ({ n: e.n, title: e.title, date: done[i] ? date[i] : null, done: done[i] }));
+}
 
 export const ficheLabel = (f: Pick<Attribution, "statut">) => (f.statut === "SIGNEE" ? "Signée" : "Non signée");
 

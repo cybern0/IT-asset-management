@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import {
-  agentName, downloadPdf, ETAT_LABEL, ficheLabel, fmtDate, openScan, type Attribution as Detention,
+  agentName, CANAL_LABEL, downloadPdf, ETAT_LABEL, ETAT_MATERIEL_LABEL, ficheLabel, fmtDate, MODE_LABEL, openScan,
+  PROVENANCE_LABEL, suivi, type Attribution as Detention,
 } from "../lib/detention";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
@@ -137,15 +138,37 @@ function DetentionDetail({ d }: { d: Detention }) {
       <dd>{value || "—"}</dd>
     </>
   );
+  const lab = (map: Record<string, string>, key: string | null) => (key ? t(map[key] ?? key) : "");
+  const origine = [lab(PROVENANCE_LABEL, d.materiel_provenance), d.materiel_provenance_detail].filter(Boolean).join(" – ");
+  const canal = [t(CANAL_LABEL[d.canal]), d.reference_canal].filter(Boolean).join(" – ");
+  const accessoires = [...d.accessoires.map((a) => t(a)), d.accessoires_autre].filter(Boolean).join(", ");
 
   return (
     <>
       <div className="fiche-row">
         <span className="badge" data-tone={tone(ficheLabel(d))}>{t(ficheLabel(d))}</span>
         {d.statut === "SIGNEE" && <span className="hint">{t("le {d}", { d: fmtDate(d.date_signature) })}</span>}
+        <span className="badge" data-tone={d.etat === "EN_COURS" ? "warn" : tone(ETAT_LABEL[d.etat])}>
+          {d.etat === "EN_COURS" ? `${t("Étape")} ${d.etape}/6` : t(ETAT_LABEL[d.etat])}
+        </span>
         <button type="button" className="btn primary" onClick={() => void downloadPdf(d)}>{t("Exporter en PDF")}</button>
         {d.a_fichier_signe && <button type="button" className="btn ghost" onClick={() => void openScan(d)}>{t("Voir le scan signé")}</button>}
       </div>
+
+      <section className="suivi" aria-label={t("Suivi du dossier")}>
+        <h3>{t("Suivi du dossier")}</h3>
+        <ol className="mini-steps">
+          {suivi(d).map((s) => (
+            <li key={s.n} data-done={s.done}>
+              <span className="dot" aria-hidden="true">{s.done ? "✓" : s.n}</span>
+              <span className="mini-title">{t(s.title)}</span>
+              <span className="hint">{s.done ? fmtDate(s.date) : d.cloture ? t("Interrompu") : t("À faire")}</span>
+            </li>
+          ))}
+        </ol>
+        {d.cloture && <p className="error">{t(d.cloture === "REFUSEE" ? "Demande refusée" : "Dossier annulé")}{d.motif_cloture ? ` : ${d.motif_cloture}` : ""}</p>}
+      </section>
+
       <div className="detail-grid">
         <section>
           <h3>{t("Matériel")}</h3>
@@ -165,7 +188,19 @@ function DetentionDetail({ d }: { d: Detention }) {
             {row("Modèle", d.materiel_modele)}
             {row("N° de série", d.materiel_serie)}
             {row("Caractéristiques", d.materiel_caracteristiques)}
+            {row("Origine du matériel", origine)}
+            {row("Date d’acquisition", fmtDate(d.materiel_date_acquisition))}
             {row("Localisation", d.materiel_localisation)}
+          </dl>
+          <h3>{t("Demande")}</h3>
+          <dl>
+            {row("Date de la demande", fmtDate(d.date_demande))}
+            {row("Canal de la demande", canal)}
+            {row("Demandeur", d.demandeur)}
+            {row("Type d’équipement demandé", d.categorie_demandee)}
+            {row("Besoin exprimé", d.besoin)}
+            {row("Validée par", d.valide_par)}
+            {row("Date de validation", fmtDate(d.date_validation))}
           </dl>
         </section>
         <section>
@@ -179,12 +214,21 @@ function DetentionDetail({ d }: { d: Detention }) {
             {row("Site", d.service_site)}
             {row("Email", d.agent_email)}
           </dl>
-          <h3>{t("Affectation")}</h3>
+          <h3>{t("Signature et remise")}</h3>
           <dl>
+            {row("Date de signature", fmtDate(d.date_signature))}
+            {row("Mode de signature", lab(MODE_LABEL, d.mode_signature))}
+            {row("Signée par", d.signe_par)}
             {row("Date de remise", fmtDate(d.date_remise))}
-            {row("Validée par", d.valide_par)}
-            {row("Date de retour", fmtDate(d.date_retour))}
+            {row("État constaté à la remise", lab(ETAT_MATERIEL_LABEL, d.etat_constate))}
+            {row("Accessoires remis", accessoires)}
+            {row("Observations à la remise", d.observations_remise)}
             {row("Enregistrée par", d.saisi_par)}
+          </dl>
+          <h3>{t("Restitution")}</h3>
+          <dl>
+            {row("Date de retour", fmtDate(d.date_retour))}
+            {row("État au retour", lab(ETAT_MATERIEL_LABEL, d.etat_retour))}
             {row("Observations", d.observations)}
           </dl>
         </section>

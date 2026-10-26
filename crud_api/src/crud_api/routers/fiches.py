@@ -101,7 +101,7 @@ async def fiche_pdf_file(fiche_id: int, db: AsyncSession = Depends(get_db)):
     d = await fiche_service.get_detention(db, fiche_id)
     if d["materiel_id"] is None:
         raise ConflictError("Sélectionnez d’abord un équipement : la fiche n’est pas encore générée.")
-    pdf = fiche_pdf.build_pdf(d, get_settings().structure_name)
+    pdf = fiche_pdf.build_pdf(d, get_settings().structure_name, await fiche_service.category_types(db))
     return Response(
         pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{d["reference"]}.pdf"'},

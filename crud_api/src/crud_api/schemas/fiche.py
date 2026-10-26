@@ -97,6 +97,9 @@ class AttributionOut(ORMModel):
     materiel_etat: str | None
     materiel_statut: str | None
     materiel_localisation: str | None
+    materiel_provenance: str | None
+    materiel_provenance_detail: str | None
+    materiel_date_acquisition: date | None
     materiel_a_image: bool
 
     agent_id: int

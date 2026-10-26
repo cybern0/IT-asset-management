@@ -82,6 +82,9 @@ def _flat(row) -> dict[str, Any]:
         "materiel_caracteristiques": m.caracteristiques if m else None,
         "materiel_etat": m.etat if m else None, "materiel_statut": m.statut if m else None,
         "materiel_localisation": m.localisation if m else None, "materiel_a_image": bool(m and m.image_chemin),
+        "materiel_provenance": m.provenance if m else None,
+        "materiel_provenance_detail": m.provenance_detail if m else None,
+        "materiel_date_acquisition": m.date_acquisition if m else None,
         "agent_id": ag.id, "agent_matricule": ag.matricule, "agent_nom": ag.nom, "agent_prenom": ag.prenom,
         "agent_fonction": ag.fonction, "agent_email": ag.email,
         "service_nom": s.nom if s else None, "service_site": s.site if s else None,
@@ -92,6 +95,12 @@ def _flat(row) -> dict[str, Any]:
 async def list_detentions(db: AsyncSession, *, limit: int = 5000) -> list[dict[str, Any]]:
     rows = (await db.execute(_select().order_by(FicheDetention.id.desc()).limit(limit))).unique().all()
     return [_flat(r) for r in rows]
+
+
+async def category_types(db: AsyncSession) -> list[tuple[str, str]]:
+    """(code, libelle) des categories du dictionnaire, dans l'ordre : options de la ligne « Type d'equipement »."""
+    rows = await db.execute(select(CategorieMateriel.code, CategorieMateriel.libelle).order_by(CategorieMateriel.id))
+    return [(code, libelle) for code, libelle in rows.all()]
 
 
 async def get_detention(db: AsyncSession, fiche_id: int) -> dict[str, Any]:
