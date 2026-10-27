@@ -4,11 +4,13 @@ import { ROLE_LABEL } from "../lib/access";
 import { useAuth } from "../lib/auth";
 import { Icon } from "../lib/icons";
 import { LANGS, useI18n } from "../lib/i18n";
+import { useMenu } from "../lib/menu";
 import { sections } from "../lib/schema";
 
 export function Sidebar() {
   const { t, lang, setLang } = useI18n();
   const { user, role, canView, logout } = useAuth();
+  const { groupsOf } = useMenu();
   const [collapsed, setCollapsed] = useState(false);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
 
@@ -58,7 +60,7 @@ export function Sidebar() {
               </button>
               {isOpen && (
                 <ul>
-                  {section.groups.map((g) => (
+                  {groupsOf(section).map((g) => (
                     <li key={g.slug}>
                       <NavLink to={`/${section.slug}/${g.slug}`} className="nav-link" title={t(g.label)}>
                         <Icon name={g.icon} />

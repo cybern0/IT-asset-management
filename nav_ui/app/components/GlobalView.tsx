@@ -3,6 +3,7 @@ import { Link, NavLink } from "react-router";
 import { DetentionView } from "./DetentionView";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
+import { useMenu } from "../lib/menu";
 import { assetEntities, categoryTab, showValue, viewOf } from "../lib/schema";
 import { useStore } from "../lib/store";
 
@@ -23,6 +24,7 @@ export function GlobalView({ tab }: { tab?: string }) {
 
 function MaterielSearch() {
   const { rows, ctx } = useStore();
+  const { categoryShown } = useMenu();
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -34,7 +36,7 @@ function MaterielSearch() {
       return {
         id: r.id,
         type: ctx.label("categorie_materiel", r.categorie_id) || t("Sans catégorie"),
-        to: tab ? `/assets/${tab.groupSlug}/${tab.key}` : null,
+        to: tab && categoryShown(r.categorie_code) ? `/assets/${tab.groupSlug}/${tab.key}` : null,
         ...v,
         haystack: entity.fields.map((f) => showValue(f, r[f.name], ctx)).join(" ").toLowerCase(),
       };

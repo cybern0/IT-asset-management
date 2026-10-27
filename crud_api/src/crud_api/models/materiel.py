@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Numeric, String, Text, func, text
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crud_api.core.database import Base
@@ -14,6 +14,8 @@ class CategorieMateriel(IdMixin, Base):
 
     code: Mapped[str] = mapped_column(String(30), unique=True)
     libelle: Mapped[str] = mapped_column(String(100))
+    # Menu dynamique : l'UI n'affiche l'onglet de cette categorie que si ce champ vaut TRUE
+    afficher_menu: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), default=True)
 
 
 class Materiel(IdMixin, Base):

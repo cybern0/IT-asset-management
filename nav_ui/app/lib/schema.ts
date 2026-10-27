@@ -419,6 +419,10 @@ const dictionnaires: Entity[] = [
     fields: [
       text("code", "Code", { required: true, unique: true }),
       text("libelle", "Libellé", { required: true }),
+      pick("afficher_menu", "Afficher au menu", YESNO, {
+        required: true, default: "true",
+        hint: "Si « Non », l’onglet de cette catégorie disparaît du menu et sa route n’est plus accessible.",
+      }),
     ],
     seed: [
       ["ORDINATEUR", "Ordinateur"], ["ECRAN", "Écran"], ["PERIPHERIQUE", "Périphérique"], ["TELEPHONE", "Téléphone"],
@@ -539,6 +543,20 @@ for (const { entity, groupSlug } of assetEntities) {
   if (entity.table === "materiel" && entity.where && !entity.where.negate) {
     categoryTab[entity.where.value] = { groupSlug, key: entity.key };
   }
+}
+
+/* ---------- menu dynamique ----------
+   Les onglets « matériel » ci-dessus forment le dictionnaire de routes possibles. Un onglet n'est affiche
+   (menu ET route) que si sa categorie existe en base avec `afficher_menu = true`. */
+export const isCategoryTab = (e: Entity): boolean => e.table === "materiel" && !!e.where && !e.where.negate;
+
+/** `categories` = lignes de categorie_materiel ; null = inconnues (API en erreur) -> tout afficher. */
+export function isCategoryShown(code: string, categories: Row[] | null): boolean {
+  return categories === null || categories.some((c) => c.code === code && c.afficher_menu === "true");
+}
+
+export function isEntityVisible(e: Entity, categories: Row[] | null): boolean {
+  return !isCategoryTab(e) || isCategoryShown(e.where!.value, categories);
 }
 
 /** Libellé lisible d'une ligne, quand une autre table la référence. */

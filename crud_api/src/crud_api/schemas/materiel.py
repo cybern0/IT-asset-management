@@ -12,6 +12,7 @@ from crud_api.schemas.common import (
 class CategorieCreate(BaseModel):
     code: S(30)
     libelle: S(100)
+    afficher_menu: bool = True  # categorie affichee (onglet) dans le menu de l'interface
 
 
 CategorieUpdate = partial(CategorieCreate, "CategorieUpdate")
@@ -21,6 +22,7 @@ class CategorieOut(ORMModel):
     id: int
     code: str
     libelle: str
+    afficher_menu: bool
 
 
 class MaterielCreate(BaseModel):
