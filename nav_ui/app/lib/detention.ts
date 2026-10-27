@@ -9,7 +9,7 @@ export type Attribution = {
   date_demande: string; valide_par: string | null; date_validation: string | null;
   date_generation: string | null;
   statut: "NON_SIGNEE" | "SIGNEE"; date_signature: string | null; mode_signature: "MANUSCRITE" | "ELECTRONIQUE" | null;
-  signe_par: string | null;
+  signe_par: string | null; signature_modifiee_par: string | null; signature_modifiee_le: string | null;
   date_remise: string | null; etat_constate: string | null; accessoires: string[];
   accessoires_autre: string | null; observations_remise: string | null;
   affectation_id: number | null; date_retour: string | null; etat_retour: string | null;

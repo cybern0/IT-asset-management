@@ -5,8 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.config import get_settings
 from crud_api.core.database import get_db
+from crud_api.core.deps import require_admin
 from crud_api.core.errors import ConflictError, NotFoundError
-from crud_api.schemas.fiche import AttributionCreate, AttributionOut, AvancerIn, MotifIn
+from crud_api.schemas.fiche import AttributionCreate, AttributionOut, AvancerIn, MotifIn, SignatureIn
 from crud_api.schemas.materiel import MaterielOut
 from crud_api.services import audit_service, fiche_pdf, fiche_service, file_store
 from crud_api.services.materiel_service import materiel_service
@@ -44,6 +45,14 @@ async def advance_attribution(fiche_id: int, data: AvancerIn, db: AsyncSession =
     """L'etape en cours est faite (validation du manager, equipement choisi, signature ou remise) : etape suivante.
     A la remise, l'affectation est creee et le materiel passe a « Attribue »."""
     return await fiche_service.advance(db, fiche_id, data)
+
+
+@router.post("/attributions/{fiche_id}/signature", response_model=AttributionOut, tags=TAG)
+async def set_attribution_signature(
+    fiche_id: int, data: SignatureIn, db: AsyncSession = Depends(get_db), _admin=Depends(require_admin)
+):
+    """L'administrateur fixe a la main l'etat de signature de la fiche : « signee » ou « a signer »."""
+    return await fiche_service.set_signature(db, fiche_id, data)
 
 
 @router.post("/attributions/{fiche_id}/reculer", response_model=AttributionOut, tags=TAG)

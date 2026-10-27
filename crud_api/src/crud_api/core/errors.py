@@ -26,3 +26,9 @@ class UnprocessableError(ServiceError):
 
 class UnauthorizedError(ServiceError):
     status_code = 401
+
+
+class ForbiddenError(ServiceError):
+    """Action reservee a un role (403)."""
+
+    status_code = 403

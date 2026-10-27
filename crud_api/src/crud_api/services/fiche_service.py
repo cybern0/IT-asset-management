@@ -6,7 +6,7 @@
 # Les etapes 1, 4 et 5 sont des gestes humains (validation, signature, remise) qui se font hors de l'application :
 # elle se contente d'enregistrer qu'ils ont eu lieu. D'ou trois actions seulement : avancer (l'etape en cours est faite),
 # reculer (on defait la derniere etape), clore (refus ou annulation). L'etape en cours est deduite des donnees.
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import Integer, cast, func, select, text
@@ -16,7 +16,7 @@ from crud_api.core.errors import ConflictError, NotFoundError, UnprocessableErro
 from crud_api.models import (
     Affectation, Agent, CategorieMateriel, Direction, FicheDetention, Materiel, Service, Utilisateur,
 )
-from crud_api.schemas.fiche import ACCESSOIRES, AttributionCreate, AvancerIn
+from crud_api.schemas.fiche import ACCESSOIRES, AttributionCreate, AvancerIn, SignatureIn
 from crud_api.services import audit_service
 
 _LOCK_KEY = 7240011  # verrou applicatif : numerotation sans doublon
@@ -68,7 +68,8 @@ def _flat(row) -> dict[str, Any]:
         "date_demande": f.date_demande, "valide_par": f.valide_par, "date_validation": f.date_validation,
         "date_generation": f.date_generation,
         "statut": f.statut, "date_signature": f.date_signature, "mode_signature": f.mode_signature,
-        "signe_par": f.signe_par,
+        "signe_par": f.signe_par, "signature_modifiee_par": f.signature_modifiee_par,
+        "signature_modifiee_le": f.signature_modifiee_le,
         "date_remise": f.date_remise, "etat_constate": f.etat_constate,
         "accessoires": [x for x in (f.accessoires or "").split(",") if x],
         "accessoires_autre": f.accessoires_autre, "observations_remise": f.observations_remise,
@@ -235,6 +236,26 @@ async def _hand_over(db: AsyncSession, f: FicheDetention, data: AvancerIn, remis
         ),
     )
     return await get_detention(db, f.id)
+
+
+async def set_signature(db: AsyncSession, fiche_id: int, data: SignatureIn) -> dict[str, Any]:
+    """L'administrateur indique a la main si la fiche est signee ou doit encore l'etre. Possible des que la fiche est
+    generee (equipement choisi) et a tout moment ensuite, meme apres la remise : une signature peut arriver en retard
+    ou etre a refaire. Qui l'a fixee et quand est conserve sur le dossier."""
+    f = await _fiche(db, fiche_id)
+    _not_closed(f)
+    if f.materiel_id is None:
+        raise ConflictError("La fiche n’est générée qu’une fois l’équipement choisi : son état de signature ne peut pas encore être renseigné.")
+    if data.signee:
+        f.statut, f.date_signature = "SIGNEE", data.date or date.today()
+        f.mode_signature, f.signe_par = data.mode_signature or "MANUSCRITE", data.signe_par
+    else:
+        f.statut, f.date_signature, f.mode_signature, f.signe_par = "NON_SIGNEE", None, None, None
+    actor_id = db.info.get("actor_id")
+    actor = await db.get(Utilisateur, actor_id) if actor_id else None
+    f.signature_modifiee_par = actor.nom_utilisateur if actor else None
+    f.signature_modifiee_le = datetime.now(timezone.utc)
+    return await _done(db, f, "SET_SIGNATURE", {"signee": data.signee, "date_signature": f.date_signature and f.date_signature.isoformat()})
 
 
 async def back(db: AsyncSession, fiche_id: int) -> dict[str, Any]:

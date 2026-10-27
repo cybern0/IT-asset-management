@@ -26,6 +26,16 @@ class MotifIn(BaseModel):
     motif: OptText = None
 
 
+class SignatureIn(BaseModel):
+    """Etat de signature de la fiche, fixe a la main par l'administrateur (la signature elle-meme a lieu hors de
+    l'application). `signee=False` remet la fiche « a signer » et efface les informations de signature."""
+
+    signee: bool
+    date: OptDate = None  # date de signature ; defaut : aujourd'hui
+    mode_signature: Literal["MANUSCRITE", "ELECTRONIQUE"] | None = None  # defaut : manuscrite
+    signe_par: OptS(150) = None
+
+
 class AvancerIn(BaseModel):
     """Etape suivante du dossier. La signature, la validation et la remise se font hors de l'application :
     on se contente d'enregistrer qu'elles ont eu lieu. Seules les informations de l'etape en cours sont lues,
@@ -68,6 +78,8 @@ class AttributionOut(ORMModel):
     date_signature: date | None
     mode_signature: str | None
     signe_par: str | None
+    signature_modifiee_par: str | None
+    signature_modifiee_le: datetime | None
     # etape 5
     date_remise: date | None
     etat_constate: str | None

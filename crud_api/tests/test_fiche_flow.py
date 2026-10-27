@@ -10,6 +10,7 @@ from sqlalchemy.ext.compiler import compiles
 from crud_api import models as M
 from crud_api.core.database import Base
 from crud_api.core.errors import ConflictError, UnprocessableError
+from crud_api.models.user import role_permission
 from crud_api.schemas.fiche import AttributionCreate, AvancerIn
 from crud_api.services import audit_service, fiche_service as fs
 
@@ -29,8 +30,8 @@ async def db(monkeypatch):
     monkeypatch.setattr(audit_service, "record", no_audit)
     engine = create_async_engine("sqlite+aiosqlite:///:memory:").execution_options(schema_translate_map={"eparc": None})
     tables = [m.__table__ for m in (
-        M.Role, M.Utilisateur, M.CategorieMateriel, M.Direction, M.Service, M.Agent, M.Materiel, M.Affectation,
-        M.FicheDetention)]
+        M.Permission, M.Role, M.Utilisateur, M.CategorieMateriel, M.Direction, M.Service, M.Agent, M.Materiel,
+        M.Affectation, M.FicheDetention)] + [role_permission]
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
     async with async_sessionmaker(engine, expire_on_commit=False)() as session:
@@ -132,3 +133,71 @@ async def test_direct_affectation_creates_a_regularisation_dossier(db):
     a = await affectation_service.create(db, AffectationCreate(materiel_id=2, agent_id=1))
     d = await fs.get_by_affectation(db, a.id)
     assert d["etape"] == 6 and d["valide_par"] == fs.REGULARISATION and d["etat"] == "ATTRIBUEE"
+
+
+async def test_admin_sets_the_signature_state_by_hand(db):
+    from crud_api.schemas.fiche import SignatureIn
+
+    f = await new_request(db, valide_par="Mme Rabe")
+    with pytest.raises(ConflictError):  # pas de fiche tant qu'aucun equipement n'est choisi
+        await fs.set_signature(db, f["id"], SignatureIn(signee=True))
+    f = await fs.advance(db, f["id"], AvancerIn(materiel_id=1))
+    assert (f["etape"], f["statut"]) == (4, "NON_SIGNEE") and f["signature_modifiee_le"] is None
+
+    # « Signee » : date, mode et signataire sont enregistres, avec la date de la mise a jour
+    f = await fs.set_signature(db, f["id"], SignatureIn(signee=True, date=date(2026, 5, 2), mode_signature="ELECTRONIQUE", signe_par="Resp. Info"))
+    assert (f["etape"], f["statut"], f["date_signature"], f["mode_signature"], f["signe_par"]) == (
+        5, "SIGNEE", date(2026, 5, 2), "ELECTRONIQUE", "Resp. Info")
+    assert f["signature_modifiee_le"] is not None
+
+    # « A signer » : tout est efface et le dossier revient a l'etape 4
+    f = await fs.set_signature(db, f["id"], SignatureIn(signee=False))
+    assert (f["etape"], f["statut"], f["date_signature"], f["mode_signature"], f["signe_par"]) == (4, "NON_SIGNEE", None, None, None)
+
+    # par defaut : manuscrite, aujourd'hui
+    f = await fs.set_signature(db, f["id"], SignatureIn(signee=True))
+    assert (f["mode_signature"], f["date_signature"]) == ("MANUSCRITE", date.today())
+
+    # la remise exige la signature, mais l'etat reste modifiable apres elle (signature en retard ou a refaire)
+    f = await fs.advance(db, f["id"], AvancerIn())
+    assert (f["etape"], f["etat"]) == (6, "ATTRIBUEE")
+    f = await fs.set_signature(db, f["id"], SignatureIn(signee=False))
+    assert (f["etape"], f["etat"], f["statut"]) == (6, "ATTRIBUEE", "NON_SIGNEE")
+
+
+async def test_signature_state_remembers_who_set_it(db):
+    from crud_api.schemas.fiche import SignatureIn
+
+    db.add_all([M.Role(id=1, code="ADMIN", libelle="Administrateur"),
+                M.Utilisateur(id=1, nom_utilisateur="admin", mot_de_passe_hash="x", role_id=1)])
+    await db.commit()
+    db.info["actor_id"] = 1
+    f = await new_request(db, valide_par="Mme Rabe")
+    f = await fs.advance(db, f["id"], AvancerIn(materiel_id=1))
+    f = await fs.set_signature(db, f["id"], SignatureIn(signee=True))
+    assert f["signature_modifiee_par"] == "admin"
+
+
+async def test_closed_dossier_signature_is_frozen(db):
+    from crud_api.schemas.fiche import SignatureIn
+
+    f = await new_request(db, valide_par="Mme Rabe")
+    f = await fs.advance(db, f["id"], AvancerIn(materiel_id=1))
+    await fs.close(db, f["id"], "Abandon")
+    with pytest.raises(ConflictError):
+        await fs.set_signature(db, f["id"], SignatureIn(signee=True))
+
+
+async def test_only_admin_can_set_signature_when_auth_is_on(db):
+    from crud_api.core.deps import require_admin
+    from crud_api.core.errors import ForbiddenError
+
+    db.add_all([M.Role(id=1, code="ADMIN", libelle="Administrateur"), M.Role(id=2, code="LECTURE", libelle="Consultation"),
+                M.Utilisateur(id=1, nom_utilisateur="admin", mot_de_passe_hash="x", role_id=1),
+                M.Utilisateur(id=2, nom_utilisateur="lecteur", mot_de_passe_hash="x", role_id=2)])
+    await db.commit()
+    assert await require_admin(None, db) is None  # authentification desactivee : ouvert, comme le reste de l'API
+    admin = await db.get(M.Utilisateur, 1)
+    assert await require_admin(admin, db) is admin
+    with pytest.raises(ForbiddenError):
+        await require_admin(await db.get(M.Utilisateur, 2), db)

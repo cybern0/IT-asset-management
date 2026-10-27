@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.config import get_settings
 from crud_api.core.database import get_db
-from crud_api.core.errors import UnauthorizedError
+from crud_api.core.errors import ForbiddenError, UnauthorizedError
 from crud_api.core.security import decode_access_token
-from crud_api.models import Utilisateur
+from crud_api.models import Role, Utilisateur
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -31,4 +31,15 @@ async def get_current_user(
     if user is None or not user.actif:
         raise UnauthorizedError("Compte inconnu ou désactivé.")
     db.info["actor_id"] = user.id
+    return user
+
+
+async def require_admin(
+    user: Utilisateur | None = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> Utilisateur | None:
+    """Reserve l'action au role ADMIN. Comme le reste de l'API, elle est ouverte tant que AUTH_ENABLED=false."""
+    if user is not None:
+        role = await db.get(Role, user.role_id)
+        if role is None or role.code != "ADMIN":
+            raise ForbiddenError("Seul un administrateur peut effectuer cette action.")
     return user

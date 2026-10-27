@@ -293,6 +293,20 @@ async def test_attribution_workflow(client):
     assert (await client.delete(f"/affectations/{f['affectation_id']}")).status_code == 409
 
 
+async def test_attribution_signature_fixee_a_la_main(client):
+    agent = await make_agent(client, "M7")
+    m = await make_materiel(client, "ORD-7")
+    f = await post(client, "/attributions", {"agent_id": agent["id"], "valide_par": "Mme Rabe"})
+    put = lambda body, code=200: post(client, f"/attributions/{f['id']}/signature", body, code)  # noqa: E731
+    await put({"signee": True}, 409)  # fiche non generee : aucun equipement choisi
+    f = await post(client, f"/attributions/{f['id']}/avancer", {"materiel_id": m["id"]}, 200)
+    s = await put({"signee": True, "date": "2026-05-02", "mode_signature": "ELECTRONIQUE", "signe_par": "Resp. Info"})
+    assert (s["etape"], s["statut"], s["date_signature"], s["mode_signature"]) == (5, "SIGNEE", "2026-05-02", "ELECTRONIQUE")
+    assert s["signature_modifiee_le"]
+    s = await put({"signee": False})
+    assert (s["etape"], s["statut"], s["date_signature"]) == (4, "NON_SIGNEE", None)
+
+
 async def test_attribution_refus_et_regularisation(client):
     agent = await make_agent(client, "M8")
     f = await post(client, "/attributions", {"agent_id": agent["id"]})

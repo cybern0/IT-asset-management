@@ -13,7 +13,7 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").to
 type StepState = "done" | "current" | "todo";
 
 // Libelle du bouton qui defait la derniere etape faite, selon l'etape en cours
-const UNDO_LABEL: Record<number, string> = { 2: "Annuler la validation", 4: "Changer d’équipement", 5: "Annuler la signature" };
+const UNDO_LABEL: Record<number, string> = { 2: "Annuler la validation", 4: "Changer d’équipement" };
 
 /**
  * Les 6 etapes du processus pour un dossier. La validation, la signature et la remise sont des gestes humains faits
@@ -113,17 +113,8 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                   </p>
                 )}
 
-                {s.n === 4 && (
-                  <>
-                    {signed && (
-                      <p className="step-sum">
-                        {t("Signée le {d}", { d: fmtDate(d.date_signature) })}
-                        {d.mode_signature ? ` · ${t(MODE_LABEL[d.mode_signature])}` : ""}
-                        {d.signe_par ? ` · ${d.signe_par}` : ""}
-                      </p>
-                    )}
-                    {st === "current" && <SignForm busy={busy} onSign={(v) => advance(v)} />}
-                  </>
+                {s.n === 4 && d.materiel_id !== null && !closed && (
+                  <SignatureControl d={d} busy={busy} onSave={(body) => run(() => post("signature", body))} />
                 )}
 
                 {s.n === 5 && (
@@ -246,33 +237,56 @@ function EquipmentPicker({ d, busy, onPick }: { d: Attribution; busy: boolean; o
   );
 }
 
-function SignForm({ busy, onSign }: { busy: boolean; onSign: (v: { mode_signature: string; date: string; signe_par?: string }) => void }) {
-  const { t } = useI18n();
-  const [mode, setMode] = useState("MANUSCRITE");
-  const [par, setPar] = useState("");
-  const [date, setDate] = useState(today());
+/**
+ * Etat de la fiche, fixe a la main (la signature a lieu hors de l'application) : « A signer » ou « Signee ».
+ * Modifiable a tout moment une fois la fiche generee, y compris apres la remise.
+ */
+function SignatureControl({ d, busy, onSave }: { d: Attribution; busy: boolean; onSave: (body: unknown) => void }) {
+  const { t, lang } = useI18n();
+  const signed = d.statut === "SIGNEE";
+  const [signee, setSignee] = useState(signed);
+  const [mode, setMode] = useState<string>(d.mode_signature ?? "MANUSCRITE");
+  const [par, setPar] = useState(d.signe_par ?? "");
+  const [date, setDate] = useState(d.date_signature ?? today());
+  const changed = signee !== signed || (signee && (mode !== (d.mode_signature ?? "MANUSCRITE") || par !== (d.signe_par ?? "") || date !== (d.date_signature ?? "")));
+  const when = d.signature_modifiee_le ? new Date(d.signature_modifiee_le).toLocaleString(lang === "mg" ? "fr" : lang) : "";
+
   return (
-    <div className="step-form">
-      <p className="hint">{t("Imprimez la fiche (Exporter en PDF) et faites-la signer par le détenteur et le responsable. Une fois signée, enregistrez ici que la signature a eu lieu : aucun scan n’est demandé.")}</p>
+    <div className="step-form sign-control">
+      <fieldset className="checks">
+        <legend>{t("État de la fiche")}</legend>
+        <label className="check"><input type="radio" name={`sig-${d.id}`} checked={!signee} onChange={() => setSignee(false)} /> {t("À signer")}</label>
+        <label className="check"><input type="radio" name={`sig-${d.id}`} checked={signee} onChange={() => setSignee(true)} /> {t("Signée")}</label>
+      </fieldset>
+      {!signed && !signee && <p className="hint">{t("Imprimez la fiche (Exporter en PDF) et faites-la signer par le détenteur et le responsable. Quand elle est signée, choisissez « Signée » ci-dessus : aucun scan n’est demandé.")}</p>}
+      {signee && (
+        <>
+          <div className="row">
+            <label>{t("Mode de signature")}
+              <select value={mode} onChange={(e) => setMode(e.target.value)}>
+                <option value="MANUSCRITE">{t("Manuscrite")}</option>
+                <option value="ELECTRONIQUE">{t("Électronique")}</option>
+              </select>
+            </label>
+            <label>{t("Date de signature")}
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+          </div>
+          <label>{t("Responsable signataire (informatique ou hiérarchique)")}
+            <input value={par} onChange={(e) => setPar(e.target.value)} />
+          </label>
+        </>
+      )}
       <div className="row">
-        <label>{t("Mode de signature")}
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="MANUSCRITE">{t("Manuscrite")}</option>
-            <option value="ELECTRONIQUE">{t("Électronique")}</option>
-          </select>
-        </label>
-        <label>{t("Date de signature")}
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-      </div>
-      <label>{t("Responsable signataire (informatique ou hiérarchique)")}
-        <input value={par} onChange={(e) => setPar(e.target.value)} />
-      </label>
-      <div className="row">
-        <button type="button" className="btn primary" disabled={busy || !date}
-          onClick={() => onSign({ mode_signature: mode, date, ...(par.trim() ? { signe_par: par.trim() } : {}) })}>
-          {t("Enregistrer la signature")}
+        <button type="button" className="btn primary" disabled={busy || !changed || (signee && !date)}
+          onClick={() => onSave({ signee, ...(signee ? { date, mode_signature: mode, ...(par.trim() ? { signe_par: par.trim() } : {}) } : {}) })}>
+          {t("Enregistrer l’état de la fiche")}
         </button>
+        {d.signature_modifiee_le && (
+          <span className="hint">
+            {t("Dernière mise à jour : {d}", { d: when })}{d.signature_modifiee_par ? ` · ${d.signature_modifiee_par}` : ""}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -53,13 +53,14 @@ uv run pytest
 
 ## Images du matériel et dossiers d'attribution
 
-Exécuter `Base de données/parc_5.sql` (colonne `materiel.image_chemin`, table `fiche_detention`, fiches des affectations existantes) puis `parc_6.sql` (retire le scan, plus géré), puis `uv sync` (ajoute `reportlab`, `openpyxl` et `python-multipart`).
+Exécuter `Base de données/parc_5.sql` (colonne `materiel.image_chemin`, table `fiche_detention`, fiches des affectations existantes) puis `parc_6.sql` (retire le scan, plus géré) et `parc_7.sql` (état de signature fixé à la main), puis `uv sync` (ajoute `reportlab`, `openpyxl` et `python-multipart`).
 
 - Les fichiers envoyés (images du matériel) sont dans `UPLOAD_DIR` (défaut `uploads/`) ; `STRUCTURE_NAME` est imprimé sur les fiches PDF.
 - `POST/GET/DELETE /materiels/{id}/image` : image du matériel (JPEG, PNG, WebP, 5 Mo).
 - **Dossier d'attribution = fiche de détention `FD-AAAA-NNNN`**, suivant les 6 étapes du processus. La validation du manager, la signature et la remise sont des gestes humains faits hors de l'application : elle se contente d'enregistrer qu'ils ont eu lieu (pas de scan, pas de contrôle de dates entre étapes). Trois actions suffisent :
   - `POST /attributions` crée la demande (étape 1) ; `GET /attributions`, `GET /attributions/{id}`, `GET /attributions/{id}/pdf` (fiche, dès qu'un équipement est choisi).
   - `POST /attributions/{id}/avancer` : l'étape en cours est faite → étape suivante. Corps facultatif selon l'étape : `valide_par` (1), `materiel_id` (2, la fiche est alors générée), `mode_signature` / `signe_par` (4), `etat_constate` / `accessoires` / `observations` (5 : l'affectation est créée et le matériel passe à « Attribué »). `date` (aujourd'hui par défaut) pour les étapes 1, 4 et 5.
+  - `POST /attributions/{id}/signature` : l'administrateur fixe à la main l'état de la fiche (`{"signee": true|false, "date", "mode_signature", "signe_par"}`), dès que l'équipement est choisi et à tout moment ensuite. La date et le compte qui l'ont fixé sont conservés (`signature_modifiee_*`, `parc_7.sql`). Réservé au rôle ADMIN quand `AUTH_ENABLED=true`.
   - `POST /attributions/{id}/reculer` : défait la dernière étape faite (impossible une fois le matériel attribué : utiliser le retour dans Affectations).
   - `POST /attributions/{id}/clore` : refuse la demande (avant validation) ou annule le dossier (après).
 - Créer une affectation directement crée un dossier de régularisation (`GET /affectations/{id}/attribution`).

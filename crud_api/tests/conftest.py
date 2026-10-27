@@ -18,7 +18,7 @@ if TEST_URL:
 
 SQL_DIR = Path(__file__).resolve().parents[2] / "Base de données"
 _first = "parc.sql" if (SQL_DIR / "parc.sql").exists() else "parc_1.sql"
-SQL_FILES = [_first, "parc_2.sql", "parc_3.sql", "parc_4.sql", "parc_5.sql", "parc_6.sql"]
+SQL_FILES = [_first, "parc_2.sql", "parc_3.sql", "parc_4.sql", "parc_5.sql", "parc_6.sql", "parc_7.sql"]
 
 
 def _sql(name: str) -> str:

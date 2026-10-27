@@ -412,8 +412,13 @@ const A: [string, string, string][] = [
   // --- tableau de bord (indicateurs, tableaux, alertes, graphiques)
   // --- fiche de détention (demande, signature, remise, restitution)
   // --- circuit d’attribution simplifié (aucun scan)
+  // --- état de signature fixé à la main
+  ["État de la fiche", "Sheet status", "Toetry ny taratasy"],
+  ["À signer", "To sign", "Tokony hosoniavina"],
+  ["Enregistrer l’état de la fiche", "Save the sheet status", "Tehirizo ny toetry ny taratasy"],
+  ["Dernière mise à jour : {d}", "Last updated: {d}", "Fanavaozana farany: {d}"],
+  ["Imprimez la fiche (Exporter en PDF) et faites-la signer par le détenteur et le responsable. Quand elle est signée, choisissez « Signée » ci-dessus : aucun scan n’est demandé.", "Print the sheet (Export to PDF) and have the holder and the manager sign it. Once signed, choose “Signed” above: no scan is required.", "Alefaso soratra ny taratasy (Alefaso amin'ny PDF) ary asaivo manao sonia ny mpitazona sy ny tompon'andraikitra. Rehefa voasonia, safidio ny « Voasonia » etsy ambony: tsy ilaina ny scan."],
   ["Annuler la validation", "Cancel the approval", "Foano ny fankatoavana"],
-  ["Imprimez la fiche (Exporter en PDF) et faites-la signer par le détenteur et le responsable. Une fois signée, enregistrez ici que la signature a eu lieu : aucun scan n’est demandé.", "Print the sheet (Export to PDF) and have the holder and the manager sign it. Once signed, record here that the signature took place: no scan is required.", "Alefaso soratra ny taratasy (Alefaso amin'ny PDF) ary asaivo manao sonia ny mpitazona sy ny tompon'andraikitra. Rehefa voasonia, soraty eto fa vita ny sonia: tsy ilaina ny scan."],
   ["En confirmant, le matériel passe au statut « Attribué ». Pensez à archiver la fiche signée (papier ou PDF).", "By confirming, the equipment is set to “Assigned”. Remember to archive the signed sheet (paper or PDF).", "Rehefa ekena, lasa « Voatendry » ny fitaovana. Aza adino ny mitahiry ny taratasy voasonia (taratasy na PDF)."],
   ["Suivi du dossier", "File tracking", "Fanaraha-maso ny antontan-taratasy"],
   ["Interrompu", "Interrupted", "Tapaka"],

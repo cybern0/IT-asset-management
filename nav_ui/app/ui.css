@@ -421,3 +421,7 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 .mini-steps li[data-done="true"] .dot { background: var(--ok-ink); color: #fff; }
 .mini-title { font-weight: 600; line-height: 1.25; }
 @media (max-width: 1100px) { .mini-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* état de signature (étape 4) */
+.badges { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.sign-control .checks { display: flex; flex-wrap: wrap; gap: 6px 18px; }

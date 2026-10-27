@@ -13,6 +13,9 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").to
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Circuit d'attribution en 6 etapes : demande -> selection -> fiche -> signature -> remise -> statut. */
+/** Fiche generee (equipement choisi), pas encore signee, dossier non clos. */
+const needsSignature = (d: Attribution) => d.cloture === null && d.materiel_id !== null && d.statut !== "SIGNEE";
+
 export function AttributionsView() {
   const { t } = useI18n();
   const [items, setItems] = useState<Attribution[]>([]);
@@ -20,6 +23,7 @@ export function AttributionsView() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [etat, setEtat] = useState("");
+  const [sig, setSig] = useState("");
   const [selected, setSelected] = useState<number | "new" | null>(null);
 
   const load = useCallback(async () => {
@@ -36,10 +40,12 @@ export function AttributionsView() {
     const q = norm(query.trim());
     return items.filter((d) => {
       if (etat && d.etat !== etat) return false;
+      if (sig === "A_SIGNER" && !(needsSignature(d))) return false;
+      if (sig === "SIGNEE" && d.statut !== "SIGNEE") return false;
       if (!q) return true;
       return norm(`${d.reference} ${agentName(d)} ${d.agent_matricule} ${d.materiel_designation ?? ""} ${d.materiel_code ?? ""}`).includes(q);
     });
-  }, [items, query, etat]);
+  }, [items, query, etat, sig]);
 
   const current = typeof selected === "number" ? items.find((d) => d.id === selected) ?? null : null;
   const replace = (f: Attribution) => setItems((list) => list.map((d) => (d.id === f.id ? f : d)));
@@ -64,6 +70,11 @@ export function AttributionsView() {
             <option value="">{t("Tous les dossiers")}</option>
             {Object.entries(ETAT_LABEL).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
           </select>
+          <select value={sig} onChange={(e) => setSig(e.target.value)} aria-label={t("État de la fiche")}>
+            <option value="">{t("Toutes les fiches")}</option>
+            <option value="A_SIGNER">{t("À signer")}</option>
+            <option value="SIGNEE">{t("Signée")}</option>
+          </select>
           <button type="button" className="btn ghost" onClick={() => void load()} disabled={loading}>{t("Actualiser")}</button>
         </div>
         <div className="pane-body">
@@ -87,7 +98,10 @@ export function AttributionsView() {
                             {d.reference} · {d.materiel_designation ?? d.categorie_demandee ?? t("Équipement à choisir")}
                           </span>
                         </span>
-                        <span className="badge" data-tone={d.etat === "EN_COURS" ? "warn" : tone(ETAT_LABEL[d.etat])}>{label}</span>
+                        <span className="badges">
+                          {needsSignature(d) && <span className="badge" data-tone="warn">{t("À signer")}</span>}
+                          <span className="badge" data-tone={d.etat === "EN_COURS" ? "warn" : tone(ETAT_LABEL[d.etat])}>{label}</span>
+                        </span>
                       </button>
                     </li>
                   );

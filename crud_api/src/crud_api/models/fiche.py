@@ -33,6 +33,8 @@ class FicheDetention(IdMixin, Base):
     date_signature: Mapped[date | None] = mapped_column(Date)
     mode_signature: Mapped[str | None] = mapped_column(String(15))
     signe_par: Mapped[str | None] = mapped_column(String(150))
+    signature_modifiee_par: Mapped[str | None] = mapped_column(String(80))  # compte qui a fixe l'etat de signature
+    signature_modifiee_le: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # etape 5
     date_remise: Mapped[date | None] = mapped_column(Date)
     etat_constate: Mapped[str | None] = mapped_column(String(15))
