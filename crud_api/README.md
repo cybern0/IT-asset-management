@@ -35,12 +35,25 @@ Requete -> routers/ (main.py les assemble) -> schemas/ (validation Pydantic)
 Erreurs : `{"detail": "message", "field": "nom_du_champ"}` (409 conflit, 422 regle ou donnee refusee) ;
 les erreurs de validation Pydantic gardent le format FastAPI standard.
 
-## Authentification
+## Authentification et autorisation
 
-Desactivee par defaut (`AUTH_ENABLED=false`). Pour l'activer : definir `JWT_SECRET`, `AUTH_ENABLED=true`
-et, au premier demarrage, `BOOTSTRAP_ADMIN_PASSWORD` pour creer le compte `admin`.
-`POST /api/v1/auth/login` renvoie un jeton a envoyer en `Authorization: Bearer ...`.
-Les permissions des roles ne sont pas encore appliquees route par route.
+Activees par `AUTH_ENABLED=true` (valeur de `.env.example`) : definir `JWT_SECRET` et, au premier demarrage,
+`BOOTSTRAP_ADMIN_PASSWORD` pour creer le compte `admin`. Avec `AUTH_ENABLED=false`, l'API reste ouverte.
+`POST /api/v1/auth/login` renvoie un jeton (a envoyer en `Authorization: Bearer ...`) et l'utilisateur avec son
+`role_code` ; `GET /auth/me` renvoie l'utilisateur courant.
+
+Droits par role (401 sans jeton valide, 403 si le role ne suffit pas) :
+
+| Ressource | ADMIN | GESTIONNAIRE | LECTURE (standard) |
+|---|---|---|---|
+| Tableau de bord, materiel, reseau, consommables, logiciels, attributions | tout | lecture, creation, modification | lecture |
+| Suppression dans ces ressources | oui | non | non |
+| Directions, services, agents | tout | lecture | lecture |
+| Utilisateurs, roles, permissions, journal d'audit | tout | aucun acces | aucun acces |
+| Signature d'une fiche | oui | non | non |
+
+Les regles sont dans `routers/__init__.py` (`require_roles` dans `core/deps.py`) ; l'interface (`nav_ui/app/lib/access.ts`)
+applique les memes pour le menu et les boutons.
 
 ## Tests
 

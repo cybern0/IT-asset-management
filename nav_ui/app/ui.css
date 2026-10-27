@@ -425,3 +425,22 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 /* état de signature (étape 4) */
 .badges { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .sign-control .checks { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+/* ---------- connexion et utilisateur connecte ---------- */
+.login-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--paper); }
+.login-card {
+  width: min(380px, 100%); display: grid; gap: 14px; padding: 28px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+}
+.login-brand { display: flex; align-items: center; gap: 10px; }
+.login-brand h1 { font-size: 18px; margin: 0; }
+.login-card h2 { font-size: 16px; margin: 0; }
+.login-card .fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
+.sidebar-user {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); color: var(--pine-ink);
+}
+.user-info { display: grid; min-width: 0; font-size: 14px; }
+.user-info strong, .user-info small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-info small { color: var(--pine-dim); }
+.is-collapsed .sidebar-user { justify-content: center; padding: 10px 0; }

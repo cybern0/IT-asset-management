@@ -1,7 +1,8 @@
 # Dependances FastAPI : utilisateur courant (authentification optionnelle)
 import jwt
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.config import get_settings
@@ -11,6 +12,12 @@ from crud_api.core.security import decode_access_token
 from crud_api.models import Role, Utilisateur
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+# Codes de la table `role` (parc_4.sql). LECTURE = utilisateur « standard », en lecture seule.
+ADMIN = "ADMIN"
+GESTIONNAIRE = "GESTIONNAIRE"
+LECTURE = "LECTURE"
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 async def get_current_user(
@@ -43,3 +50,34 @@ async def require_admin(
         if role is None or role.code != "ADMIN":
             raise ForbiddenError("Seul un administrateur peut effectuer cette action.")
     return user
+
+
+async def role_code_of(db: AsyncSession, user: Utilisateur) -> str | None:
+    return await db.scalar(select(Role.code).where(Role.id == user.role_id))
+
+
+def require_roles(*, read: frozenset[str], write: frozenset[str], delete: frozenset[str] | None = None):
+    """Autorisation par role selon la methode HTTP : lecture (GET), ecriture (POST/PATCH...) et suppression (DELETE).
+
+    `delete` vaut `write` s'il est omis. Ouvert tant que AUTH_ENABLED=false, comme le reste de l'API.
+    L'authentification (401) est verifiee avant, par get_current_user ; un role insuffisant donne 403.
+    """
+    delete_roles = write if delete is None else delete
+
+    async def checker(
+        request: Request,
+        user: Utilisateur | None = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> None:
+        if user is None:
+            return
+        if request.method in SAFE_METHODS:
+            allowed = read
+        elif request.method == "DELETE":
+            allowed = delete_roles
+        else:
+            allowed = write
+        if await role_code_of(db, user) not in allowed:
+            raise ForbiddenError("Votre rôle ne permet pas d'effectuer cette action.")
+
+    return checker

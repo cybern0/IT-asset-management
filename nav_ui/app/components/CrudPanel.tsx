@@ -8,6 +8,7 @@ import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
 import { uiFieldErrors } from "../lib/mapping";
 import { matches, showValue, viewOf, type Entity, type Field, type Row } from "../lib/schema";
+import { useAuth } from "../lib/auth";
 import { useStore } from "../lib/store";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -15,6 +16,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function CrudPanel({ entity }: { entity: Entity }) {
   const { rows, save, remove, refresh, ctx } = useStore();
   const { t } = useI18n();
+  const { can } = useAuth();
   const tableRows = rows[entity.table] ?? [];
   const list = tableRows.filter((r) => matches(entity, r));
   const addLabel = t("Ajouter {x}", { x: t(entity.singular) });
@@ -24,8 +26,10 @@ export function CrudPanel({ entity }: { entity: Entity }) {
   const hiddenName = w && !w.negate ? (w.via?.setField ?? w.field) : null;
   const shown = entity.fields.filter((f) => f.name !== hiddenName);
 
-  const canCreate = !entity.readOnly && !entity.noCreate;
-  const canEdit = !entity.readOnly && !entity.immutable;
+  // droits du rôle (lib/access.ts) en plus des réglages de l'onglet
+  const canCreate = !entity.readOnly && !entity.noCreate && can("write");
+  const canEdit = !entity.readOnly && !entity.immutable && can("write");
+  const canDelete = canEdit && can("delete");
 
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null); // id | "new" | null
@@ -360,7 +364,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
                   {busy ? t("Enregistrement…") : t(isNew ? "Créer" : "Enregistrer les modifications")}
                 </button>
               )}
-              {!isNew && canEdit && (
+              {!isNew && canDelete && (
                 <button type="button" className={`btn ${confirming ? "danger" : "ghost"}`} onClick={() => void destroy()} disabled={busy}>
                   {t(confirming ? "Confirmer la suppression" : "Supprimer")}
                 </button>

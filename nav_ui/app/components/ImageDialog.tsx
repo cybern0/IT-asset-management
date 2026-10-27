@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { Modal } from "./Modal";
 
@@ -15,6 +16,7 @@ type Props = {
 /** Apercu de l'image d'un materiel, avec envoi, remplacement et suppression. */
 export function ImageDialog({ materielId, title, hasImage, onClose, onChanged }: Props) {
   const { t } = useI18n();
+  const { can } = useAuth();
   const [present, setPresent] = useState(hasImage);
   const [src, setSrc] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -60,10 +62,12 @@ export function ImageDialog({ materielId, title, hasImage, onClose, onChanged }:
           ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f); }}
         />
-        <button type="button" className="btn primary" disabled={busy} onClick={() => input.current?.click()}>
-          {busy ? t("Envoi…") : present ? t("Remplacer l’image") : t("Ajouter une image")}
-        </button>
-        {present && (
+        {can("write") && (
+          <button type="button" className="btn primary" disabled={busy} onClick={() => input.current?.click()}>
+            {busy ? t("Envoi…") : present ? t("Remplacer l’image") : t("Ajouter une image")}
+          </button>
+        )}
+        {present && can("delete") && (
           <button
             type="button" className={`btn ${confirming ? "danger" : "ghost"}`} disabled={busy}
             onClick={() => (confirming
@@ -73,7 +77,7 @@ export function ImageDialog({ materielId, title, hasImage, onClose, onChanged }:
             {confirming ? t("Confirmer la suppression") : t("Supprimer l’image")}
           </button>
         )}
-        <span className="hint">{t("JPEG, PNG ou WebP, 5 Mo maximum.")}</span>
+        {can("write") && <span className="hint">{t("JPEG, PNG ou WebP, 5 Mo maximum.")}</span>}
         {error && <p className="error foot-error" role="alert">{error}</p>}
       </div>
     </Modal>

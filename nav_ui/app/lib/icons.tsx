@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { IconName } from "./schema";
 
-export type UiIconName = IconName | "dashboard" | "chevron" | "panel" | "plus" | "search";
+export type UiIconName = IconName | "dashboard" | "chevron" | "panel" | "plus" | "search" | "logout";
 
 const paths: Record<UiIconName, ReactNode> = {
   monitor: <><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M8 20h8M12 16v4" /></>,
@@ -19,6 +19,7 @@ const paths: Record<UiIconName, ReactNode> = {
   panel: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></>,
+  logout: <><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4" /><path d="M16 8l4 4-4 4M20 12H9" /></>,
 };
 
 export function Icon({ name, size = 20 }: { name: UiIconName; size?: number }) {

@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router";
+import { ROLE_LABEL } from "../lib/access";
+import { useAuth } from "../lib/auth";
 import { Icon } from "../lib/icons";
 import { LANGS, useI18n } from "../lib/i18n";
 import { sections } from "../lib/schema";
 
 export function Sidebar() {
   const { t, lang, setLang } = useI18n();
+  const { user, role, canView, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
 
@@ -29,17 +32,20 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav" aria-label={t("Navigation principale")}>
-        <div className="nav-section">
-          <ul>
-            <li>
-              <NavLink to="/dashboard" className="nav-link" title={t("Tableau de bord")}>
-                <Icon name="dashboard" />
-                <span className="label">{t("Tableau de bord")}</span>
-              </NavLink>
-            </li>
-          </ul>
-        </div>
-        {sections.map((section) => {
+        {canView("dashboard") && (
+          <div className="nav-section">
+            <ul>
+              <li>
+                <NavLink to="/dashboard" className="nav-link" title={t("Tableau de bord")}>
+                  <Icon name="dashboard" />
+                  <span className="label">{t("Tableau de bord")}</span>
+                </NavLink>
+              </li>
+            </ul>
+          </div>
+        )}
+        {/* seules les sections autorisées pour le rôle apparaissent (voir lib/access.ts) */}
+        {sections.filter((s) => canView(s.slug)).map((section) => {
           const isOpen = collapsed || !closed[section.slug];
           return (
             <div className="nav-section" key={section.slug}>
@@ -66,6 +72,19 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="sidebar-user">
+        <span className="user-info label">
+          <strong>{user?.nom_utilisateur}</strong>
+          <small>{role ? t(ROLE_LABEL[role]) : t("Rôle inconnu")}</small>
+        </span>
+        <button
+          type="button" className="icon-btn" onClick={logout}
+          aria-label={t("Se déconnecter")} title={t("Se déconnecter")}
+        >
+          <Icon name="logout" />
+        </button>
+      </div>
 
       <div className="sidebar-foot" role="group" aria-label={t("Langue")}>
         {LANGS.map((l) => (

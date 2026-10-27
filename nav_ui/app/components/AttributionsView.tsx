@@ -4,6 +4,7 @@ import {
   agentName, CANAL_LABEL, downloadPdf, ETAT_LABEL, type Attribution,
 } from "../lib/detention";
 import { Icon } from "../lib/icons";
+import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { tone } from "../lib/schema";
 import { useStore } from "../lib/store";
@@ -18,6 +19,7 @@ const needsSignature = (d: Attribution) => d.cloture === null && d.materiel_id !
 
 export function AttributionsView() {
   const { t } = useI18n();
+  const { can } = useAuth();
   const [items, setItems] = useState<Attribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -55,10 +57,12 @@ export function AttributionsView() {
       <section className="pane" aria-label={t("Liste : {x}", { x: t("Attributions") })}>
         <div className="pane-head">
           <h2>{t("Attributions")} <span className="count">{visible.length}</span></h2>
-          <button type="button" className="add-btn" onClick={() => setSelected("new")}
-            aria-label={t("Nouvelle demande d’équipement")} title={t("Nouvelle demande d’équipement")}>
-            <Icon name="plus" />
-          </button>
+          {can("write") && (
+            <button type="button" className="add-btn" onClick={() => setSelected("new")}
+              aria-label={t("Nouvelle demande d’équipement")} title={t("Nouvelle demande d’équipement")}>
+              <Icon name="plus" />
+            </button>
+          )}
         </div>
         <label className="search">
           <Icon name="search" size={16} />

@@ -9,6 +9,8 @@ import {
   useRouteError,
 } from "react-router";
 import type { LinksFunction, MetaFunction } from "react-router";
+import { AuthProvider } from "./lib/auth";
+import { I18nProvider } from "./lib/i18n";
 import "./ui.css";
 
 export const links: LinksFunction = () => [
@@ -41,7 +43,13 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    <I18nProvider>
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    </I18nProvider>
+  );
 }
 
 export function ErrorBoundary() {

@@ -57,6 +57,7 @@ class UserOut(ORMModel):
     actif: bool
     derniere_connexion: datetime | None
     cree_le: datetime
+    role_code: str | None = None  # renseigne par /auth/login et /auth/me (ADMIN, GESTIONNAIRE, LECTURE)
 
 
 class LoginIn(BaseModel):

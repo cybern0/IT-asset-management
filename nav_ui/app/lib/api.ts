@@ -15,11 +15,25 @@ export class ApiError extends Error {
   }
 }
 
+/** Utilisateur connecte, tel que renvoye par /auth/login et /auth/me. */
+export type AuthUser = {
+  id: number;
+  nom_utilisateur: string;
+  role_id: number;
+  role_code: string | null; // ADMIN, GESTIONNAIRE, LECTURE...
+};
+
 const TOKEN_KEY = "parc-token";
 const TIMEOUT_MS = 15_000;
 
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+
+// Appele quand l'API repond 401 (jeton expire ou refuse) : l'interface revient a l'ecran de connexion.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
 }
 
 export function setToken(token: string | null): void {
@@ -69,6 +83,10 @@ async function send(method: string, path: string, init: Init = {}): Promise<Resp
     clearTimeout(timer);
   }
   if (!res.ok) {
+    if (res.status === 401 && path !== "/auth/login") {
+      setToken(null);
+      onUnauthorized?.();
+    }
     let data: unknown = null;
     try { data = await res.json(); } catch { /* corps non JSON */ }
     throw parseError(res.status, data);
@@ -101,5 +119,5 @@ export const api = {
   /** Fichier binaire (image, PDF) : l'authentification passe par l'en-tete, pas par une URL. */
   blob: async (path: string): Promise<Blob> => (await send("GET", path, { timeout: UPLOAD_TIMEOUT_MS })).blob(),
   login: (nom_utilisateur: string, mot_de_passe: string) =>
-    request<{ access_token: string }>("POST", "/auth/login", { nom_utilisateur, mot_de_passe }),
+    request<{ access_token: string; user: AuthUser }>("POST", "/auth/login", { nom_utilisateur, mot_de_passe }),
 };

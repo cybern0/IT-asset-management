@@ -243,6 +243,44 @@ async def test_authentication_when_enabled(client, monkeypatch):
     assert any(e["action"] == "CREATE" and e["utilisateur_id"] is not None for e in entries)
 
 
+async def test_authorization_by_role(client, monkeypatch):
+    """ADMIN : tout. GESTIONNAIRE : lit et modifie le parc, ne supprime pas, pas d'administration. LECTURE : lecture seule."""
+    roles = {x["code"]: x["id"] for x in (await client.get("/roles")).json()}
+    for name, code in (("adm", "ADMIN"), ("ges", "GESTIONNAIRE"), ("lec", "LECTURE")):
+        await post(client, "/utilisateurs", {"nom_utilisateur": name, "mot_de_passe": "secret-123", "role_id": roles[code]})
+    m = await make_materiel(client, "ORD-A")
+    settings = get_settings()
+    monkeypatch.setattr(settings, "auth_enabled", True)
+    monkeypatch.setattr(settings, "jwt_secret", "x" * 40)
+
+    async def login(name, code):
+        r = await client.post("/auth/login", json={"nom_utilisateur": name, "mot_de_passe": "secret-123"})
+        assert r.status_code == 200 and r.json()["user"]["role_code"] == code
+        auth = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        assert (await client.get("/auth/me", headers=auth)).json()["role_code"] == code
+        return auth
+
+    lec = await login("lec", "LECTURE")
+    assert (await client.get("/materiels", headers=lec)).status_code == 200
+    assert (await client.get("/agents", headers=lec)).status_code == 200
+    assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "X"}, headers=lec)).status_code == 403
+    assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=lec)).status_code == 403
+    assert (await client.get("/utilisateurs", headers=lec)).status_code == 403
+
+    ges = await login("ges", "GESTIONNAIRE")
+    assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "PC 2"}, headers=ges)).status_code == 200
+    assert (await client.delete(f"/materiels/{m['id']}", headers=ges)).status_code == 403
+    assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=ges)).status_code == 403
+    assert (await client.get("/utilisateurs", headers=ges)).status_code == 403
+    assert (await client.get("/journal-audit", headers=ges)).status_code == 403
+
+    adm = await login("adm", "ADMIN")
+    assert (await client.get("/utilisateurs", headers=adm)).status_code == 200
+    assert (await client.get("/journal-audit", headers=adm)).status_code == 200
+    assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=adm)).status_code == 201
+    assert (await client.delete(f"/materiels/{m['id']}", headers=adm)).status_code == 204
+
+
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
 
 

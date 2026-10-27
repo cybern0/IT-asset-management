@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { api, ApiError } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import {
   ACCESSOIRES, agentName, CANAL_LABEL, downloadPdf, ETAPES, ETAT_LABEL, fmtDate, MODE_LABEL, type Attribution,
 } from "../lib/detention";
@@ -21,7 +22,9 @@ const UNDO_LABEL: Record<number, string> = { 2: "Annuler la validation", 4: "Cha
  */
 export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f: Attribution) => void }) {
   const { t } = useI18n();
+  const { can } = useAuth();
   const { refresh } = useStore();
+  const writable = can("write"); // lecture seule : on voit le dossier mais aucune action n'est proposée
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
@@ -88,7 +91,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                       <dd>{t(CANAL_LABEL[d.canal])}{d.reference_canal ? ` · ${d.reference_canal}` : ""}{d.demandeur ? ` · ${d.demandeur}` : ""} · {fmtDate(d.date_demande)}</dd>
                       {d.valide_par && <><dt>{t("Validée par")}</dt><dd>{d.valide_par} · {fmtDate(d.date_validation)}</dd></>}
                     </dl>
-                    {st === "current" && <ValidateForm busy={busy} onValidate={(v) => advance(v)} />}
+                    {st === "current" && writable && <ValidateForm busy={busy} onValidate={(v) => advance(v)} />}
                   </>
                 )}
 
@@ -100,7 +103,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                         {d.materiel_serie ? ` · ${t("N° de série")} ${d.materiel_serie}` : ""}
                       </p>
                     )}
-                    {st === "current" && <EquipmentPicker d={d} busy={busy} onPick={(id) => advance({ materiel_id: id })} />}
+                    {st === "current" && writable && <EquipmentPicker d={d} busy={busy} onPick={(id) => advance({ materiel_id: id })} />}
                   </>
                 )}
 
@@ -113,7 +116,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                   </p>
                 )}
 
-                {s.n === 4 && d.materiel_id !== null && !closed && (
+                {s.n === 4 && d.materiel_id !== null && !closed && writable && (
                   <SignatureControl d={d} busy={busy} onSave={(body) => run(() => post("signature", body))} />
                 )}
 
@@ -126,7 +129,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                         {d.accessoires.length || d.accessoires_autre ? ` · ${[...d.accessoires, d.accessoires_autre].filter(Boolean).join(", ")}` : ""}
                       </p>
                     )}
-                    {st === "current" && <HandOverForm busy={busy} d={d} onSubmit={(body) =>
+                    {st === "current" && writable && <HandOverForm busy={busy} d={d} onSubmit={(body) =>
                       advance(body, () => refresh(["materiel", "affectation", "journal_audit"]))} />}
                   </>
                 )}
@@ -143,7 +146,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
         })}
       </ol>
 
-      {!closed && !attributed && (
+      {!closed && !attributed && writable && (
         <div className="attrib-foot">
           {confirmClose ? (
             <>
