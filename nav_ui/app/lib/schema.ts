@@ -230,7 +230,12 @@ export function categoryTabOf(code: string, categories: Row[]): { groupSlug: str
   return c && g ? { groupSlug: g.slug, key: categoryEntity(c, new Set(g.entities.map((e) => e.key))).key } : null;
 }
 
-const materiel: Entity[] = [
+/* Attributions (processus en étapes) puis Affectations (historique) : menu propre, en tête de la section Assets. */
+const attribution: Entity[] = [
+  ent({
+    key: "attributions", label: "Attributions", singular: "une attribution", table: "affectation",
+    custom: "attributions", titleFields: ["id"], fields: [],
+  }),
   ent({
     key: "affectations", label: "Affectations", singular: "une affectation", table: "affectation",
     titleFields: ["materiel_id"], subtitleFields: ["agent_id"],
@@ -258,10 +263,6 @@ const materiel: Entity[] = [
       return e;
     },
     seed: [{ materiel_id: "computers-seed-0", agent_id: "a1", date_remise: "2026-09-01", etat_remise: "BON" }],
-  }),
-  ent({
-    key: "attributions", label: "Attributions", singular: "une attribution", table: "affectation",
-    custom: "attributions", titleFields: ["id"], fields: [],
   }),
 ];
 
@@ -482,39 +483,7 @@ const dictionnaires: Entity[] = [
   }),
 ];
 
-const automatisation: Entity[] = [
-  ent({
-    key: "rules", label: "Rules", singular: "une règle", local: true,
-    titleFields: ["name"], subtitleFields: ["trigger"], badgeField: "active",
-    fields: [
-      text("name", "Nom", { required: true }),
-      pick("trigger", "Déclencheur", ["Création", "Modification", "Import"], { required: true }),
-      area("condition", "Condition"), area("action", "Action"),
-      pick("active", "Active", YESNO, { required: true }),
-    ],
-  }),
-  ent({
-    key: "forms", label: "Forms", singular: "un formulaire", local: true,
-    titleFields: ["title"], subtitleFields: ["target"], badgeField: "published",
-    fields: [
-      text("title", "Titre", { required: true }),
-      pick("target", "Cible", ["Ordinateur", "Imprimante", "Téléphone", "Réseau", "Autre"]),
-      area("fields", "Champs (un par ligne)"),
-      pick("published", "Publié", YESNO, { required: true }),
-    ],
-  }),
-];
-
 const suivi: Entity[] = [
-  ent({
-    key: "queue", label: "Notification queue", singular: "une notification", local: true,
-    titleFields: ["subject"], subtitleFields: ["to"], badgeField: "state",
-    fields: [
-      text("to", "Destinataire", { required: true }), text("subject", "Sujet", { required: true }),
-      pick("channel", "Canal", ["E-mail", "SMS"]), date("scheduled", "Planifiée le"),
-      pick("state", "État", ["En attente", "Envoyée", "Échec"], { required: true }),
-    ],
-  }),
   ent({
     key: "logs", label: "Logs", singular: "une entrée de journal", table: "journal_audit", readOnly: true,
     titleFields: ["action"], subtitleFields: ["table_cible", "identifiant_cible"],
@@ -541,25 +510,13 @@ const suivi: Entity[] = [
   }),
 ];
 
-const inventory: Entity[] = [
-  ent({
-    key: "inventory", label: "Inventory", singular: "une source d’inventaire", local: true,
-    titleFields: ["name"], subtitleFields: ["kind"], badgeField: "state",
-    fields: [
-      text("name", "Source", { required: true }),
-      pick("kind", "Type", ["Agent", "Import CSV", "Réseau (SNMP)"]),
-      date("lastRun", "Dernière exécution"), num("found", "Éléments trouvés"),
-      pick("state", "État", ["Terminé", "En cours", "Échec"], { required: true }),
-    ],
-  }),
-];
-
 export const sections: Section[] = [
   {
     slug: "assets",
     label: "Assets",
     groups: [
-      { slug: "materiel", label: "Matériel", icon: "monitor", categoryMenu: "Matériel", categoriesFirst: true, description: "Matériel individualisé par catégorie, et son historique d’affectation aux agents.", entities: materiel },
+      { slug: "attribution", label: "Attributions et affectations", icon: "users", description: "Dossiers d’attribution du matériel aux agents, puis historique des affectations et retours.", entities: attribution },
+      { slug: "materiel", label: "Matériel", icon: "monitor", categoryMenu: "Matériel", categoriesFirst: true, description: "Matériel individualisé, un onglet par catégorie.", entities: [] },
       { slug: "reseau", label: "Réseau et baies", icon: "network", categoryMenu: "Réseau", categoriesFirst: true, description: "Équipements réseau, baies, câblage, cartes SIM : même table matériel, une catégorie par onglet.", entities: [] },
       { slug: "consommables", label: "Consommables et stocks", icon: "printer", categoryMenu: "Consommables et stocks", description: "Articles, stocks par service et mouvements d’entrée, sortie et transfert.", entities: consommables },
       { slug: "logiciels", label: "Logiciels", icon: "layers", categoryMenu: "Logiciels", description: "Logiciels installés et licences associées.", entities: logiciels },
@@ -573,9 +530,7 @@ export const sections: Section[] = [
       { slug: "organisation", label: "Organisation", icon: "network", description: "Directions, services et agents.", entities: organisation },
       { slug: "acces", label: "Accès", icon: "users", description: "Comptes utilisateurs, rôles et leurs permissions.", entities: acces },
       { slug: "dictionnaires", label: "Dictionnaires", icon: "layers", description: "Listes de référence utilisées par les formulaires.", entities: dictionnaires },
-      { slug: "automatisation", label: "Automatisation", icon: "sliders", description: "Règles et formulaires personnalisés.", entities: automatisation },
-      { slug: "suivi", label: "Suivi", icon: "clock", description: "File de notifications et journaux d’activité.", entities: suivi },
-      { slug: "inventory", label: "Inventory", icon: "scan", description: "Sources et exécutions d’inventaire automatique.", entities: inventory },
+      { slug: "suivi", label: "Journal d’audit", icon: "clock", description: "Journal des actions effectuées dans l’application.", entities: suivi },
     ],
   },
 ];
