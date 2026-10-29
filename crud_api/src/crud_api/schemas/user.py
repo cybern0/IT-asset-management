@@ -65,6 +65,14 @@ class LoginIn(BaseModel):
     mot_de_passe: str
 
 
+class ProfileUpdate(BaseModel):
+    """Modification de son propre compte : le mot de passe actuel est toujours exige."""
+
+    mot_de_passe_actuel: str = Field(min_length=1, max_length=128)
+    nom_utilisateur: S(80) | None = None
+    nouveau_mot_de_passe: str | None = Field(default=None, min_length=8, max_length=128)
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

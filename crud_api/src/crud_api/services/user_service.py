@@ -6,10 +6,10 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crud_api.core.errors import ConflictError, UnauthorizedError
+from crud_api.core.errors import ConflictError, UnauthorizedError, UnprocessableError
 from crud_api.core.security import hash_password, verify_password
 from crud_api.models import Role, Utilisateur
-from crud_api.schemas.user import UserCreate
+from crud_api.schemas.user import ProfileUpdate, UserCreate
 from crud_api.services import audit_service
 from crud_api.services.base import CRUDService
 
@@ -69,6 +69,30 @@ class UserService(CRUDService[Utilisateur]):
         await audit_service.record(db, "LOGIN", "utilisateur", user.id)
         await db.commit()
         return user
+
+    async def update_profile(self, db: AsyncSession, user: Utilisateur, data: ProfileUpdate) -> Utilisateur:
+        """Un utilisateur modifie son propre nom et/ou mot de passe (role, statut : jamais).
+
+        Erreurs en 422 (et non 401) : l'interface deconnecte l'utilisateur sur tout 401."""
+        if not verify_password(data.mot_de_passe_actuel, user.mot_de_passe_hash):
+            raise UnprocessableError("Mot de passe actuel incorrect.", field="mot_de_passe_actuel")
+        changed: list[str] = []
+        if data.nom_utilisateur and data.nom_utilisateur != user.nom_utilisateur:
+            user.nom_utilisateur = data.nom_utilisateur
+            changed.append("nom_utilisateur")
+        if data.nouveau_mot_de_passe:
+            if data.nouveau_mot_de_passe == data.mot_de_passe_actuel:
+                raise UnprocessableError(
+                    "Le nouveau mot de passe doit être différent de l’actuel.", field="nouveau_mot_de_passe"
+                )
+            user.mot_de_passe_hash = hash_password(data.nouveau_mot_de_passe)
+            changed.append("mot_de_passe")  # seul le nom du champ est journalise, jamais sa valeur
+        if not changed:
+            raise UnprocessableError("Aucune modification à enregistrer.")
+        await self._flush(db, "update")  # nom deja pris -> 409 « Cette valeur existe déjà. »
+        await audit_service.record(db, "UPDATE_PROFIL", "utilisateur", user.id, {"champs": changed})
+        await db.commit()
+        return await self.get(db, user.id)
 
     async def bootstrap_admin(self, db: AsyncSession, password: str) -> None:
         """Cree le compte `admin` si la table est vide (utile quand l'authentification est activee)."""

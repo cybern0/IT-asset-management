@@ -6,6 +6,7 @@ export default [
   layout("routes/shell.tsx", [
     index("routes/home.tsx"),
     route("dashboard", "routes/dashboard.tsx"),
+    route("profil", "routes/profile.tsx"),
     route("assets/:group/:tab?", "routes/module.tsx", { id: "assets" }),
     route("administration/:group/:tab?", "routes/module.tsx", { id: "administration" }),
     route("*", "routes/notfound.tsx"),

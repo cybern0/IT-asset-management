@@ -14,9 +14,13 @@ type Auth = {
   role: RoleCode | null; // null si non connecte ou role inconnu (aucun droit)
   login: (username: string, password: string) => Promise<void>; // leve ApiError si refuse
   logout: () => void;
+  /** Modifie son propre nom d'utilisateur et/ou mot de passe (le mot de passe actuel est exige). Leve ApiError. */
+  updateProfile: (input: ProfileInput) => Promise<void>;
   can: (permission: Permission) => boolean;
   canView: (area: Area) => boolean;
 };
+
+export type ProfileInput = { currentPassword: string; username?: string; newPassword?: string };
 
 const AuthCtx = createContext<Auth | null>(null);
 
@@ -65,14 +69,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("anon");
   }, []);
 
+  const updateProfile = useCallback(async (input: ProfileInput) => {
+    const updated = await api.patch<AuthUser>("/auth/me", {
+      mot_de_passe_actuel: input.currentPassword,
+      nom_utilisateur: input.username || undefined,
+      nouveau_mot_de_passe: input.newPassword || undefined,
+    });
+    setUser(updated); // le menu affiche tout de suite le nouveau nom
+  }, []);
+
   const value = useMemo<Auth>(() => {
     const role = isRoleCode(user?.role_code) ? user.role_code : null;
     return {
-      status, user, role, login, logout,
+      status, user, role, login, logout, updateProfile,
       can: (p) => role !== null && PERMISSIONS[role].includes(p),
       canView: (a) => role !== null && AREA_ROLES[a].includes(role),
     };
-  }, [status, user, login, logout]);
+  }, [status, user, login, logout, updateProfile]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

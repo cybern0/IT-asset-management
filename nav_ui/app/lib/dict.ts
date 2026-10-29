@@ -582,6 +582,24 @@ const A: [string, string, string][] = [
   ["Expirées", "Expired", "Lany daty"],
   ["Postes", "Workstations", "Toerana miasa"],
   ["Jours restants", "Days left", "Andro sisa"],
+  // --- profil utilisateur
+  ["Mon profil", "My profile", "Ny mombamomba ahy"],
+  ["Modifiez votre nom d’utilisateur et votre mot de passe.", "Change your username and password.", "Ovay ny anaranao sy ny tenimiafinao."],
+  ["Informations du compte", "Account information", "Fampahalalana momba ny kaonty"],
+  ["Changer le nom d’utilisateur", "Change username", "Ovay ny anaran'ny mpampiasa"],
+  ["Changer le mot de passe", "Change password", "Ovay ny teny miafina"],
+  ["Mot de passe actuel", "Current password", "Teny miafina ankehitriny"],
+  ["Nouveau mot de passe", "New password", "Teny miafina vaovao"],
+  ["Confirmer le nouveau mot de passe", "Confirm new password", "Hamafiso ny teny miafina vaovao"],
+  ["Au moins {n} caractères.", "At least {n} characters.", "Farafahakeliny {n} ny tarehintsoratra."],
+  ["Enregistrer", "Save", "Tehirizo"],
+  ["Nom d’utilisateur mis à jour.", "Username updated.", "Voaova ny anaran'ny mpampiasa."],
+  ["Mot de passe mis à jour.", "Password updated.", "Voaova ny teny miafina."],
+  ["Saisissez votre mot de passe actuel.", "Enter your current password.", "Ampidiro ny teny miafina ankehitriny."],
+  ["Les deux mots de passe ne correspondent pas.", "The two passwords do not match.", "Tsy mitovy ny teny miafina roa."],
+  ["Aucune modification à enregistrer.", "Nothing to save.", "Tsy misy fanovana hotehirizina."],
+  ["Mot de passe actuel incorrect.", "Current password is incorrect.", "Diso ny teny miafina ankehitriny."],
+  ["Le nouveau mot de passe doit être différent de l’actuel.", "The new password must differ from the current one.", "Tsy maintsy hafa amin'ny ankehitriny ny teny miafina vaovao."],
 ];
 
 // [anglais (clé), français, malgache] : noms de rubriques écrits en anglais dans le code

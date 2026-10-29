@@ -76,10 +76,13 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-user">
-        <span className="user-info label">
-          <strong>{user?.nom_utilisateur}</strong>
-          <small>{role ? t(ROLE_LABEL[role]) : t("Rôle inconnu")}</small>
-        </span>
+        <NavLink to="/profil" className="user-link" title={t("Mon profil")} aria-label={t("Mon profil")}>
+          <Icon name="user" />
+          <span className="user-info label">
+            <strong>{user?.nom_utilisateur}</strong>
+            <small>{role ? t(ROLE_LABEL[role]) : t("Rôle inconnu")}</small>
+          </span>
+        </NavLink>
         <button
           type="button" className="icon-btn" onClick={logout}
           aria-label={t("Se déconnecter")} title={t("Se déconnecter")}

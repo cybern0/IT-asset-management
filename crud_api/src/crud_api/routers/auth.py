@@ -6,7 +6,7 @@ from crud_api.core.deps import get_current_user, role_code_of
 from crud_api.core.errors import UnauthorizedError
 from crud_api.core.security import create_access_token
 from crud_api.models import Utilisateur
-from crud_api.schemas.user import LoginIn, TokenOut, UserOut
+from crud_api.schemas.user import LoginIn, ProfileUpdate, TokenOut, UserOut
 from crud_api.services.user_service import user_service
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
@@ -28,3 +28,13 @@ async def me(user: Utilisateur | None = Depends(get_current_user), db: AsyncSess
     if user is None:
         raise UnauthorizedError("Authentification désactivée ou non connecté.")
     return await _user_out(db, user)
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    data: ProfileUpdate, user: Utilisateur | None = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    """Profil : l'utilisateur connecte change son nom d'utilisateur et/ou son mot de passe."""
+    if user is None:
+        raise UnauthorizedError("Authentification désactivée ou non connecté.")
+    return await _user_out(db, await user_service.update_profile(db, user, data))

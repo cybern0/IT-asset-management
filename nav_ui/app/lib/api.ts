@@ -21,6 +21,8 @@ export type AuthUser = {
   nom_utilisateur: string;
   role_id: number;
   role_code: string | null; // ADMIN, GESTIONNAIRE, LECTURE...
+  derniere_connexion?: string | null;
+  cree_le?: string;
 };
 
 const TOKEN_KEY = "parc-token";
@@ -111,6 +113,7 @@ export const api = {
   update: (endpoint: string, id: string, body: Json) => request<Json>("PATCH", `/${endpoint}/${id}`, body),
   remove: (endpoint: string, id: string) => request<void>("DELETE", `/${endpoint}/${id}`),
   get: <T = Json>(path: string) => request<T>("GET", path),
+  patch: <T = Json>(path: string, body: unknown) => request<T>("PATCH", path, body),
   post: <T = Json>(path: string) => request<T>("POST", path),
   del: (path: string) => request<void>("DELETE", path),
   /** Envoi de fichier (multipart) : le navigateur fixe lui-meme le Content-Type. */
