@@ -23,7 +23,8 @@ export default function Profile() {
         <p className="lede">{t("Modifiez votre nom d’utilisateur et votre mot de passe.")}</p>
       </header>
 
-      <div className="profile">
+      <div className="profile-scroll">
+       <div className="profile">
         <section className="profile-card" aria-label={t("Informations du compte")}>
           <h2>{t("Informations du compte")}</h2>
           <dl className="profile-facts">
@@ -36,6 +37,7 @@ export default function Profile() {
 
         <UsernameForm />
         <PasswordForm />
+       </div>
       </div>
     </>
   );

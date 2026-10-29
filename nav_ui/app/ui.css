@@ -467,7 +467,8 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 .is-collapsed .sidebar-user { justify-content: center; padding: 10px 0; }
 
 /* ---------- profil ---------- */
-.profile { display: grid; gap: 16px; max-width: 640px; }
+.profile-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
+.profile { display: grid; padding-bottom: 12px; gap: 16px; max-width: 640px; }
 .profile-card { padding: 14px 16px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 12px; }
 .profile-card h2 { font-size: 17px; font-weight: 700; color: var(--pine); margin: 0; }
 .profile-facts { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; font-size: 14px; }
