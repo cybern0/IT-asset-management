@@ -3,13 +3,25 @@ SET client_encoding TO 'UTF8';
 
 SET search_path TO eparc, public;
 
--- Menu dynamique : une categorie de materiel n'apparait dans le menu (onglets de l'interface) que si
--- `afficher_menu` vaut TRUE. Les onglets de l'interface forment le « dictionnaire » de routes possibles ;
--- la base decide lesquels sont affiches. Par defaut, toutes les categories existantes restent visibles.
+-- Menu dynamique : chaque categorie de materiel declare, via `category_menu`, le menu de l'interface
+-- sous lequel son onglet apparait (Materiel, Reseau, Consommables et stocks, Logiciels).
+-- Creer une categorie suffit : son onglet est genere automatiquement dans le bon menu.
 -- Script rejouable.
-ALTER TABLE categorie_materiel
-    ADD COLUMN IF NOT EXISTS afficher_menu BOOLEAN NOT NULL DEFAULT TRUE;
 
--- Exemple : masquer les cartes SIM du menu, puis les remettre
--- UPDATE categorie_materiel SET afficher_menu = FALSE WHERE code = 'SIM';
--- UPDATE categorie_materiel SET afficher_menu = TRUE  WHERE code = 'SIM';
+-- L'ancien champ booleen est remplace par `category_menu`
+ALTER TABLE categorie_materiel DROP COLUMN IF EXISTS afficher_menu;
+
+ALTER TABLE categorie_materiel
+    ADD COLUMN IF NOT EXISTS category_menu VARCHAR(30) NOT NULL DEFAULT 'Matériel';
+
+ALTER TABLE categorie_materiel DROP CONSTRAINT IF EXISTS ck_categorie_materiel_category_menu;
+ALTER TABLE categorie_materiel
+    ADD CONSTRAINT ck_categorie_materiel_category_menu
+    CHECK (category_menu IN ('Matériel', 'Réseau', 'Consommables et stocks', 'Logiciels'));
+
+-- Reprise de l'existant : les categories reseau etaient deja regroupees dans le menu « Réseau et baies ».
+-- (ne touche que les lignes encore a la valeur par defaut)
+UPDATE categorie_materiel
+   SET category_menu = 'Réseau'
+ WHERE code IN ('RESEAU', 'BAIE', 'CHASSIS', 'PDU', 'PASSIF', 'CABLE', 'SIM')
+   AND category_menu = 'Matériel';

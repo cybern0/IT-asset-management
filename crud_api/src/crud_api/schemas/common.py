@@ -10,6 +10,7 @@ STATUT = Literal["EN_STOCK", "ATTRIBUE", "EN_MAINTENANCE", "REFORME"]
 PROVENANCE = Literal["ACHAT", "DOTATION", "AFFECTATION", "PROJET", "DON", "AUTRE"]
 TYPE_LICENCE = Literal["SANS_LICENCE", "PERPETUELLE", "ABONNEMENT"]
 TYPE_MOUVEMENT = Literal["ENTREE", "SORTIE", "TRANSFERT", "AJUSTEMENT"]
+CATEGORY_MENU = Literal["Matériel", "Réseau", "Consommables et stocks", "Logiciels"]
 
 
 def _blank_to_none(value):

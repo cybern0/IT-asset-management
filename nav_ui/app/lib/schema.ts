@@ -71,6 +71,10 @@ export type Entity = {
   ) => Record<string, string>;
 };
 
+/** Valeurs de categorie_materiel.category_menu (CHECK cote base) : un menu de l'interface chacune. */
+export const CATEGORY_MENUS = ["Matériel", "Réseau", "Consommables et stocks", "Logiciels"] as const;
+export type CategoryMenu = (typeof CATEGORY_MENUS)[number];
+
 export type IconName =
   | "monitor" | "layers" | "printer" | "network" | "rack"
   | "globe" | "users" | "sliders" | "clock" | "scan";
@@ -81,6 +85,10 @@ export type Group = {
   description: string;
   icon: IconName;
   kind?: "crud" | "global";
+  /** Valeur de categorie_materiel.category_menu dont les categories alimentent ce menu (onglets generes). */
+  categoryMenu?: CategoryMenu;
+  /** Onglets de categories places avant les onglets fixes (par defaut : apres). */
+  categoriesFirst?: boolean;
   entities: Entity[];
 };
 
@@ -161,7 +169,10 @@ function materielTab(
 }
 
 /* ================= ASSETS ================= */
-const materiel: Entity[] = [
+/* Gabarits d'onglets « matériel », un par code de catégorie connu : clé d'URL, libellé d'aide, données d'exemple.
+   Ils ne sont PAS dans le menu : les onglets du menu sont générés depuis categorie_materiel (voir
+   categoryEntity). Une catégorie sans gabarit reçoit un onglet générique. */
+const categoryTemplates: Entity[] = [
   materielTab("computers", "Computers", "un ordinateur", "ORDINATEUR",
     "RAM: 16 Go, Stockage: 512 Go SSD, OS: Windows 11 Pro, CPU: Intel i5-1235U", [
       { code_inventaire: "ORD-0001", designation: "Dell Latitude 5440", marque: "Dell", modele: "Latitude 5440", numero_serie: "7KQ2N93", caracteristiques: "RAM: 16 Go, Stockage: 512 Go SSD, OS: Windows 11 Pro, CPU: Intel i5-1235U", provenance: "ACHAT", etat: "BON", statut: "ATTRIBUE", localisation: "Bureau 12" },
@@ -174,6 +185,52 @@ const materiel: Entity[] = [
     { code_inventaire: "IMP-0001", designation: "Canon iR 1643", marque: "Canon", modele: "iR 1643", caracteristiques: "Type: Multifonction, IP: 10.0.0.41", provenance: "ACHAT", etat: "BON", statut: "EN_STOCK" },
   ]),
   materielTab("unmanaged", "Unmanaged assets", "un équipement non géré", "NON_GERE", "IP: 10.0.0.77, MAC: AA:BB:CC:DD:EE:FF, Type détecté: caméra"),
+  materielTab("network", "Network devices", "un équipement réseau", "RESEAU", "Type: Switch, Ports: 24, IP: 10.0.0.2", [
+    { code_inventaire: "RES-0001", designation: "Cisco Catalyst 2960", marque: "Cisco", modele: "Catalyst 2960", caracteristiques: "Type: Switch, Ports: 24, IP: 10.0.0.2", provenance: "ACHAT", etat: "BON", statut: "ATTRIBUE", localisation: "Salle serveur" },
+  ]),
+  materielTab("racks", "Racks", "une baie", "BAIE", "Salle: Serveur, Hauteur: 42U"),
+  materielTab("enclosures", "Enclosures", "un châssis", "CHASSIS", "Baie: BAI-0001, Position: 12U"),
+  materielTab("pdus", "PDUs", "une PDU", "PDU", "Baie: BAI-0001, Puissance max: 3600 W, Prises: 12"),
+  materielTab("passive", "Passive devices", "un équipement passif", "PASSIF", "Type: Panneau de brassage, Baie: BAI-0001, Position: 40U"),
+  materielTab("cables", "Cables", "un câble", "CABLE", "Type: RJ45 Cat6, Longueur: 3 m"),
+  materielTab("simcards", "SIM cards", "une carte SIM", "SIM", "Numéro: 034 00 000 00, Opérateur: Telma, Forfait: Pro"),
+];
+
+/** code de catégorie -> gabarit (clé d'URL conservée pour les catégories historiques). */
+const templateByCode: Record<string, Entity> = Object.fromEntries(
+  categoryTemplates.map((e) => [e.where!.value, e]),
+);
+
+const slugify = (code: string) => code.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+/** Onglet généré pour une ligne de categorie_materiel. Le libellé suit la base : renommer la catégorie renomme l'onglet. */
+export function categoryEntity(c: Row, takenKeys: Set<string> = new Set()): Entity {
+  const tpl = templateByCode[c.code];
+  let key = tpl?.key ?? (slugify(c.code) || `categorie-${c.id}`);
+  if (takenKeys.has(key)) key = `cat-${key}`;
+  const base = tpl ?? materielTab(key, c.libelle, `un équipement « ${c.libelle} »`, c.code, "Clé: valeur, Clé: valeur");
+  return { ...base, key, label: c.libelle };
+}
+
+/** Menu (groupe) de l'interface qui accueille les catégories d'un `category_menu`. */
+const groupOfMenu = (m: string): Group | undefined =>
+  sections.flatMap((s) => s.groups).find((g) => g.categoryMenu === m);
+
+/** Onglets générés de tous les menus, d'après les catégories chargées. Ordre = ordre des catégories. */
+export function categoryEntities(categories: Row[], g: Group): Entity[] {
+  if (!g.categoryMenu) return [];
+  const taken = new Set(g.entities.map((e) => e.key));
+  return categories.filter((c) => c.category_menu === g.categoryMenu).map((c) => categoryEntity(c, taken));
+}
+
+/** Onglet (menu + clé) qui affiche une catégorie, pour les liens de la vue Global. */
+export function categoryTabOf(code: string, categories: Row[]): { groupSlug: string; key: string } | null {
+  const c = categories.find((x) => x.code === code);
+  const g = c && groupOfMenu(c.category_menu);
+  return c && g ? { groupSlug: g.slug, key: categoryEntity(c, new Set(g.entities.map((e) => e.key))).key } : null;
+}
+
+const materiel: Entity[] = [
   ent({
     key: "affectations", label: "Affectations", singular: "une affectation", table: "affectation",
     titleFields: ["materiel_id"], subtitleFields: ["agent_id"],
@@ -201,22 +258,11 @@ const materiel: Entity[] = [
       return e;
     },
     seed: [{ materiel_id: "computers-seed-0", agent_id: "a1", date_remise: "2026-09-01", etat_remise: "BON" }],
-  }),  ent({
+  }),
+  ent({
     key: "attributions", label: "Attributions", singular: "une attribution", table: "affectation",
     custom: "attributions", titleFields: ["id"], fields: [],
   }),
-];
-
-const reseau: Entity[] = [
-  materielTab("network", "Network devices", "un équipement réseau", "RESEAU", "Type: Switch, Ports: 24, IP: 10.0.0.2", [
-    { code_inventaire: "RES-0001", designation: "Cisco Catalyst 2960", marque: "Cisco", modele: "Catalyst 2960", caracteristiques: "Type: Switch, Ports: 24, IP: 10.0.0.2", provenance: "ACHAT", etat: "BON", statut: "ATTRIBUE", localisation: "Salle serveur" },
-  ]),
-  materielTab("racks", "Racks", "une baie", "BAIE", "Salle: Serveur, Hauteur: 42U"),
-  materielTab("enclosures", "Enclosures", "un châssis", "CHASSIS", "Baie: BAI-0001, Position: 12U"),
-  materielTab("pdus", "PDUs", "une PDU", "PDU", "Baie: BAI-0001, Puissance max: 3600 W, Prises: 12"),
-  materielTab("passive", "Passive devices", "un équipement passif", "PASSIF", "Type: Panneau de brassage, Baie: BAI-0001, Position: 40U"),
-  materielTab("cables", "Cables", "un câble", "CABLE", "Type: RJ45 Cat6, Longueur: 3 m"),
-  materielTab("simcards", "SIM cards", "une carte SIM", "SIM", "Numéro: 034 00 000 00, Opérateur: Telma, Forfait: Pro"),
 ];
 
 const consommables: Entity[] = [
@@ -419,9 +465,9 @@ const dictionnaires: Entity[] = [
     fields: [
       text("code", "Code", { required: true, unique: true }),
       text("libelle", "Libellé", { required: true }),
-      pick("afficher_menu", "Afficher au menu", YESNO, {
-        required: true, default: "true",
-        hint: "Si « Non », l’onglet de cette catégorie disparaît du menu et sa route n’est plus accessible.",
+      pick("category_menu", "Catégorie au menu", [...CATEGORY_MENUS], {
+        required: true, default: "Matériel",
+        hint: "Menu de l’interface sous lequel l’onglet de cette catégorie apparaît automatiquement.",
       }),
     ],
     seed: [
@@ -429,7 +475,10 @@ const dictionnaires: Entity[] = [
       ["IMPRIMANTE", "Imprimante"], ["NON_GERE", "Équipement non géré"], ["RESEAU", "Équipement réseau"],
       ["BAIE", "Baie"], ["CHASSIS", "Châssis"], ["PDU", "PDU"], ["PASSIF", "Équipement passif"],
       ["CABLE", "Câble"], ["SIM", "Carte SIM"],
-    ].map(([code, libelle]) => ({ id: code, code, libelle })),
+    ].map(([code, libelle]) => ({
+      id: code, code, libelle,
+      category_menu: ["RESEAU", "BAIE", "CHASSIS", "PDU", "PASSIF", "CABLE", "SIM"].includes(code) ? "Réseau" : "Matériel",
+    })),
   }),
 ];
 
@@ -510,10 +559,10 @@ export const sections: Section[] = [
     slug: "assets",
     label: "Assets",
     groups: [
-      { slug: "materiel", label: "Matériel", icon: "monitor", description: "Matériel individualisé par catégorie, et son historique d’affectation aux agents.", entities: materiel },
-      { slug: "reseau", label: "Réseau et baies", icon: "network", description: "Équipements réseau, baies, câblage, cartes SIM : même table matériel, une catégorie par onglet.", entities: reseau },
-      { slug: "consommables", label: "Consommables et stocks", icon: "printer", description: "Articles, stocks par service et mouvements d’entrée, sortie et transfert.", entities: consommables },
-      { slug: "logiciels", label: "Logiciels", icon: "layers", description: "Logiciels installés et licences associées.", entities: logiciels },
+      { slug: "materiel", label: "Matériel", icon: "monitor", categoryMenu: "Matériel", categoriesFirst: true, description: "Matériel individualisé par catégorie, et son historique d’affectation aux agents.", entities: materiel },
+      { slug: "reseau", label: "Réseau et baies", icon: "network", categoryMenu: "Réseau", categoriesFirst: true, description: "Équipements réseau, baies, câblage, cartes SIM : même table matériel, une catégorie par onglet.", entities: [] },
+      { slug: "consommables", label: "Consommables et stocks", icon: "printer", categoryMenu: "Consommables et stocks", description: "Articles, stocks par service et mouvements d’entrée, sortie et transfert.", entities: consommables },
+      { slug: "logiciels", label: "Logiciels", icon: "layers", categoryMenu: "Logiciels", description: "Logiciels installés et licences associées.", entities: logiciels },
       { slug: "global", label: "Global", icon: "globe", kind: "global", description: "Recherche dans tout le matériel et liste croisée matériel × agent détenteur, avec fiches de détention.", entities: [] },
     ],
   },
@@ -531,33 +580,16 @@ export const sections: Section[] = [
   },
 ];
 
-export const allEntities: Entity[] = sections.flatMap((s) => s.groups.flatMap((g) => g.entities));
+/** Entités fixes du menu + gabarits d'onglets de catégories (champs de la table materiel, table de la vue Global). */
+export const allEntities: Entity[] = [
+  ...sections.flatMap((s) => s.groups.flatMap((g) => g.entities)),
+  ...categoryTemplates,
+];
 
-export const assetEntities: { entity: Entity; groupSlug: string }[] = sections[0].groups.flatMap((g) =>
-  g.entities.map((entity) => ({ entity, groupSlug: g.slug })),
-);
-
-/** categorie_id -> onglet qui l'affiche (pour les liens de la vue Global). */
-export const categoryTab: Record<string, { groupSlug: string; key: string }> = {};
-for (const { entity, groupSlug } of assetEntities) {
-  if (entity.table === "materiel" && entity.where && !entity.where.negate) {
-    categoryTab[entity.where.value] = { groupSlug, key: entity.key };
-  }
-}
-
-/* ---------- menu dynamique ----------
-   Les onglets « matériel » ci-dessus forment le dictionnaire de routes possibles. Un onglet n'est affiche
-   (menu ET route) que si sa categorie existe en base avec `afficher_menu = true`. */
-export const isCategoryTab = (e: Entity): boolean => e.table === "materiel" && !!e.where && !e.where.negate;
-
-/** `categories` = lignes de categorie_materiel ; null = inconnues (API en erreur) -> tout afficher. */
-export function isCategoryShown(code: string, categories: Row[] | null): boolean {
-  return categories === null || categories.some((c) => c.code === code && c.afficher_menu === "true");
-}
-
-export function isEntityVisible(e: Entity, categories: Row[] | null): boolean {
-  return !isCategoryTab(e) || isCategoryShown(e.where!.value, categories);
-}
+export const assetEntities: { entity: Entity; groupSlug: string }[] = [
+  ...categoryTemplates.map((entity) => ({ entity, groupSlug: "materiel" })),
+  ...sections[0].groups.flatMap((g) => g.entities.map((entity) => ({ entity, groupSlug: g.slug }))),
+];
 
 /** Libellé lisible d'une ligne, quand une autre table la référence. */
 export const tableLabel: Record<string, (r: Row) => string> = {

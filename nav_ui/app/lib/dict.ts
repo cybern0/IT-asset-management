@@ -241,6 +241,8 @@ const A: [string, string, string][] = [
   ["Directions", "Directorates", "Fitarihana"],
   ["Services", "Departments", "Sampana"],
   ["Agents", "Agents", "Mpiasa"],
+  ["Catégorie au menu", "Menu category", "Sokajy ao amin'ny menio"],
+  ["Menu de l’interface sous lequel l’onglet de cette catégorie apparaît automatiquement.", "Interface menu under which this category's tab automatically appears.", "Menio ao amin'ny rindranasa hiseho ho azy ny tabilao amin'ity sokajy ity."],
   ["Catégories de matériel", "Hardware categories", "Sokajin'ny fitaovana"],
   // --- « un/une … » (bouton +)
   ["un ordinateur", "a computer", "solosaina"],

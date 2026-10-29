@@ -5,14 +5,14 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from crud_api.schemas.common import (
-    ETAT, PROVENANCE, STATUT, ORMModel, OptDate, OptS, OptText, S, partial,
+    CATEGORY_MENU, ETAT, PROVENANCE, STATUT, ORMModel, OptDate, OptS, OptText, S, partial,
 )
 
 
 class CategorieCreate(BaseModel):
     code: S(30)
     libelle: S(100)
-    afficher_menu: bool = True  # categorie affichee (onglet) dans le menu de l'interface
+    category_menu: CATEGORY_MENU = "Matériel"  # menu de l'interface sous lequel l'onglet de la categorie apparait
 
 
 CategorieUpdate = partial(CategorieCreate, "CategorieUpdate")
@@ -22,7 +22,7 @@ class CategorieOut(ORMModel):
     id: int
     code: str
     libelle: str
-    afficher_menu: bool
+    category_menu: str
 
 
 class MaterielCreate(BaseModel):
