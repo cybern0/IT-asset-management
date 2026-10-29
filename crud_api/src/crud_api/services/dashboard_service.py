@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 from calendar import monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -25,6 +25,7 @@ Data = dict[str, list[dict[str, Any]]]
 Report = dict[str, Any]
 
 MOIS_MIN, MOIS_MAX, MOIS_DEFAUT = 3, 36, 12
+JOURS_MIN, JOURS_MAX = 2, 62  # evolution courte : un point par jour (1 semaine = 7, 1 mois = 30)
 STATUTS = ["EN_STOCK", "ATTRIBUE", "EN_MAINTENANCE", "REFORME"]
 ETATS = [("NEUF", "Neuf"), ("BON", "Bon"), ("A_REPARER", "À réparer"), ("EN_PANNE", "En panne"), ("REFORME", "Réformé")]
 PROVENANCES = [
@@ -129,9 +130,13 @@ def _statut(ok: bool) -> tuple[str, str]:
 
 
 # ----------------------------------------------------------------- calcul
-def compute(data: Data, today: date, months: int = MOIS_DEFAUT, cfg: Settings | None = None) -> Report:
+def compute(data: Data, today: date, months: int = MOIS_DEFAUT, cfg: Settings | None = None,
+            days: int | None = None) -> Report:
+    """`days` : evolution sur les n derniers jours (un point par jour) ; sinon sur `months` mois (un point par mois)."""
     cfg = cfg or get_settings()
     months = max(MOIS_MIN, min(MOIS_MAX, months))
+    if days is not None:
+        days = max(JOURS_MIN, min(JOURS_MAX, days))
 
     cat_label = {c["id"]: c["libelle"] for c in data["categories"]}
     agents = {a["id"]: a for a in data["agents"]}
@@ -401,15 +406,29 @@ def compute(data: Data, today: date, months: int = MOIS_DEFAUT, cfg: Settings | 
     alerts.sort(key=lambda a: PRIORITE_ORDRE[a["priorite"]])
 
     # ---- evolution : les seules donnees representees par des graphiques
-    mois = _month_list(today, months)
-    labels = [f"{y}-{m:02d}" for y, m in mois]
-    ends = [_month_end(y, m) for y, m in mois]
+    if days:  # un point par jour, du plus ancien a aujourd'hui
+        ends = [today - timedelta(days=days - 1 - i) for i in range(days)]
+        labels = [e.isoformat() for e in ends]
+
+        def bucket(d: date) -> str:
+            return d.isoformat()
+
+        per, fin = "par jour", "fin de journée"
+    else:  # un point par mois, du plus ancien au mois courant
+        mois = _month_list(today, months)
+        labels = [f"{y}-{m:02d}" for y, m in mois]
+        ends = [_month_end(y, m) for y, m in mois]
+
+        def bucket(d: date) -> str:
+            return f"{d.year}-{d.month:02d}"
+
+        per, fin = "par mois", "fin de mois"
 
     def per_month(dates: list[date | None]) -> list[int]:
         c = {lab: 0 for lab in labels}
         for d in dates:
-            if d and f"{d.year}-{d.month:02d}" in c:
-                c[f"{d.year}-{d.month:02d}"] += 1
+            if d and bucket(d) in c:
+                c[bucket(d)] += 1
         return [c[lab] for lab in labels]
 
     parc_fin = [sum(1 for x in materiels if x["_acq"] and x["_acq"] <= e) for e in ends]
@@ -422,32 +441,33 @@ def compute(data: Data, today: date, months: int = MOIS_DEFAUT, cfg: Settings | 
         c = {lab: 0.0 for lab in labels}
         for x in mv:
             d = _day(x["cree_le"])
-            if x["type_mouvement"] == kind and d and f"{d.year}-{d.month:02d}" in c:
-                c[f"{d.year}-{d.month:02d}"] += _num(x["quantite"])
+            if x["type_mouvement"] == kind and d and bucket(d) in c:
+                c[bucket(d)] += _num(x["quantite"])
         return [_round(c[lab], 3) for lab in labels]
 
     charts = [
         {"code": "parc", "title": "Évolution du parc", "kind": "line", "unit": "",
-         "note": "Équipements acquis, cumul en fin de mois.",
+         "note": f"Équipements acquis, cumul en {fin}.",
          "series": [{"name": "Équipements", "values": parc_fin}, {"name": "Équipements attribués", "values": actives_fin}]},
         {"code": "taux", "title": "Taux d’attribution", "kind": "line", "unit": "%", "band": [tmin, tmax],
          "note": "Reconstitué à partir des dates de remise et de retour ; la bande indique l’objectif.",
          "series": [{"name": "Taux d’attribution", "values": taux_fin}]},
-        {"code": "affectations", "title": "Affectations et retours par mois", "kind": "bar", "unit": "",
+        {"code": "affectations", "title": f"Affectations et retours {per}", "kind": "bar", "unit": "",
          "series": [{"name": "Affectations", "values": per_month([a["date_remise"] for a in affectations])},
                     {"name": "Retours", "values": per_month([a["date_retour"] for a in affectations])}]},
-        {"code": "dossiers", "title": "Dossiers d’attribution par mois", "kind": "bar", "unit": "",
+        {"code": "dossiers", "title": f"Dossiers d’attribution {per}", "kind": "bar", "unit": "",
          "series": [{"name": "Demandes", "values": per_month([_day(f["date_demande"]) for f in fiches])},
                     {"name": "Signatures", "values": per_month([_day(f["date_signature"]) for f in fiches])},
                     {"name": "Remises", "values": per_month([_day(f["date_remise"]) for f in fiches])}]},
-        {"code": "mouvements", "title": "Mouvements de consommables par mois", "kind": "line", "unit": "",
+        {"code": "mouvements", "title": f"Mouvements de consommables {per}", "kind": "line", "unit": "",
          "note": "Quantités entrées et sorties.",
          "series": [{"name": "Entrées", "values": qty("ENTREE")}, {"name": "Sorties", "values": qty("SORTIE")}]},
     ]
 
     return {
         "generated_at": today.isoformat(),
-        "months": months,
+        "months": None if days else months,
+        "days": days,
         "overview": overview,
         "tables": tables,
         "alerts": alerts,
@@ -455,8 +475,8 @@ def compute(data: Data, today: date, months: int = MOIS_DEFAUT, cfg: Settings | 
     }
 
 
-async def build(db: AsyncSession, months: int = MOIS_DEFAUT) -> Report:
-    return compute(await load(db), date.today(), months)
+async def build(db: AsyncSession, months: int = MOIS_DEFAUT, days: int | None = None) -> Report:
+    return compute(await load(db), date.today(), months, days=days)
 
 
 def fmt(cell: Any) -> str:

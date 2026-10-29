@@ -19,8 +19,12 @@ export function TimeChart({ chart, labels }: { chart: Chart; labels: string[] })
   const { t, lang } = useI18n();
   const locale = lang === "mg" ? "fr" : lang;
   const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
+  // « YYYY-MM » = un mois, « YYYY-MM-DD » = un jour (evolution sur 1 semaine / 1 mois)
   const month = (iso: string, long = false) => {
-    const [y, m] = iso.split("-").map(Number);
+    const [y, m, d] = iso.split("-").map(Number);
+    if (d) {
+      return new Date(y, m - 1, d).toLocaleDateString(locale, long ? { day: "numeric", month: "short", year: "numeric" } : { day: "2-digit", month: "short" });
+    }
     return new Date(y, m - 1, 1).toLocaleDateString(locale, { month: "short", year: long ? "numeric" : "2-digit" });
   };
 

@@ -74,8 +74,13 @@ def _cell_text(key: str, v: Any) -> str:
 
 
 def _month_label(iso: str) -> str:
-    y, m = iso.split("-")
-    return f"{m}/{y[2:]}"
+    """« mm/aa » pour un mois (YYYY-MM), « jj/mm » pour un jour (YYYY-MM-DD)."""
+    parts = iso.split("-")
+    return f"{parts[2]}/{parts[1]}" if len(parts) == 3 else f"{parts[1]}/{parts[0][2:]}"
+
+
+def _period(report: Report) -> str:
+    return f"{report['days']} jours" if report.get("days") else f"{report['months']} mois"
 
 
 def _title(report: Report) -> str:
@@ -208,7 +213,7 @@ def build_pdf(report: Report) -> bytes:
 
     banner = Table([[_p(_title(report), S_TITLE)],
                     [_p(f"Édité le {date.fromisoformat(report['generated_at']).strftime('%d/%m/%Y')} · "
-                        f"évolution sur {report['months']} mois", S_SUB)]], colWidths=[width])
+                        f"évolution sur {_period(report)}", S_SUB)]], colWidths=[width])
     banner.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), PINE), ("TOPPADDING", (0, 0), (-1, -1), 7),
                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
     story += [banner]
@@ -409,7 +414,7 @@ def build_xlsx(report: Report) -> bytes:
     chart_row = 4
     for ch in report["evolution"]["charts"]:
         row = _xl_section(ws, row, ch["title"])
-        _xl_header(ws, row, ["Mois"] + [s["name"] for s in ch["series"]])
+        _xl_header(ws, row, ["Jour" if report.get("days") else "Mois"] + [s["name"] for s in ch["series"]])
         head_row = row
         for i, lab in enumerate(labels, start=1):
             ws.cell(row=row + i, column=1, value=lab).border = BOX

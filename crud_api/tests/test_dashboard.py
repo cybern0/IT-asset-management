@@ -101,3 +101,27 @@ def test_exports():
     wb = load_workbook(BytesIO(dashboard_export.build_xlsx(r)))
     assert {"Synthèse", "Alertes", "Évolution"} <= set(wb.sheetnames)
     assert len(wb["Évolution"]._charts) == 5
+
+
+def test_evolution_by_day_one_week_and_one_month():
+    week = ds.compute(sample(), TODAY, 12, CFG, days=7)
+    ev = week["evolution"]
+    assert ev["labels"][0] == "2026-10-19" and ev["labels"][-1] == "2026-10-25" and len(ev["labels"]) == 7
+    assert week["days"] == 7 and week["months"] is None
+    for c in ev["charts"]:
+        assert all(len(s["values"]) == 7 for s in c["series"])
+    mouv = next(c for c in ev["charts"] if c["code"] == "mouvements")
+    assert mouv["title"].endswith("par jour") and sum(mouv["series"][1]["values"]) == 0  # sortie du 9 : hors semaine
+
+    month = ds.compute(sample(), TODAY, 12, CFG, days=30)
+    assert len(month["evolution"]["labels"]) == 30
+    mouv = next(c for c in month["evolution"]["charts"] if c["code"] == "mouvements")
+    assert mouv["series"][0]["values"][month["evolution"]["labels"].index("2026-10-02")] == 10
+    assert mouv["series"][1]["values"][month["evolution"]["labels"].index("2026-10-09")] == 4
+
+
+def test_exports_by_day():
+    r = ds.compute(sample(), TODAY, 12, CFG, days=7)
+    assert dashboard_export.build_pdf(r)[:4] == b"%PDF"
+    wb = load_workbook(BytesIO(dashboard_export.build_xlsx(r)))
+    assert wb["Évolution"]["A5"].value == "2026-10-19" or wb["Évolution"]["A6"].value == "2026-10-19"
