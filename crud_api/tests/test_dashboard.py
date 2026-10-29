@@ -99,7 +99,7 @@ def test_exports():
     r = ds.compute(sample(), TODAY, 12, CFG)
     assert dashboard_export.build_pdf(r)[:4] == b"%PDF"
     wb = load_workbook(BytesIO(dashboard_export.build_xlsx(r)))
-    assert {"Synthèse", "Alertes", "Évolution"} <= set(wb.sheetnames)
+    assert {"Synthèse", "Évolution"} <= set(wb.sheetnames) and "Alertes" not in wb.sheetnames
     assert len(wb["Évolution"]._charts) == 5
 
 
@@ -125,3 +125,24 @@ def test_exports_by_day():
     assert dashboard_export.build_pdf(r)[:4] == b"%PDF"
     wb = load_workbook(BytesIO(dashboard_export.build_xlsx(r)))
     assert wb["Évolution"]["A5"].value == "2026-10-19" or wb["Évolution"]["A6"].value == "2026-10-19"
+
+
+def test_exports_follow_period_and_match_ui():
+    """Les exports reprennent la periode choisie, la vue d'ensemble (barres + echelle) et les alertes de l'interface."""
+    for kw, label, n in (({"days": 7}, "7 jours", 7), ({}, "36 mois", 36)):
+        r = ds.compute(sample(), TODAY, 36, CFG, **kw)
+        assert len(r["evolution"]["labels"]) == n
+        wb = load_workbook(BytesIO(dashboard_export.build_xlsx(r)))
+        for name in wb.sheetnames:
+            assert label in wb[name]["A2"].value  # periode visible sur chaque feuille
+        syn = wb["Synthèse"]
+        assert [c.value for c in syn[5][:4]] == ["Indicateur", "Valeur", "Échelle", None]
+        assert syn["C7"].value == 100  # taux d'attribution : echelle 0-100, comme l'interface
+        assert syn.conditional_formatting  # barres de donnees
+        assert "Alertes" not in wb.sheetnames  # pas de feuille d'alertes dans l'export
+        assert dashboard_export.build_pdf(r)[:4] == b"%PDF"
+
+
+def test_nice_max_matches_interface():
+    assert dashboard_export._nice_max(0) == 1 and dashboard_export._nice_max(6) == 10
+    assert dashboard_export._nice_max(1.2) == 2 and dashboard_export._nice_max(2.4) == 2.5

@@ -96,7 +96,7 @@ export async function downloadExport(kind: "pdf" | "xlsx", period: Period): Prom
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `tableau-de-bord-parc-${new Date().toISOString().slice(0, 10)}.${kind}`;
+  a.download = `tableau-de-bord-parc-${new Date().toISOString().slice(0, 10)}-${period.n}${period.unit === "days" ? "j" : "m"}.${kind}`;
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -1,5 +1,6 @@
 # Exports du tableau de bord : PDF (reportlab) et Excel (openpyxl, graphiques natifs)
 # Les deux partent du rapport JSON produit par dashboard_service.compute() : un seul calcul, trois sorties.
+import math
 import re
 from datetime import date
 from io import BytesIO
@@ -8,6 +9,7 @@ from xml.sax.saxutils import escape
 
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, LineChart, Reference
+from openpyxl.formatting.rule import DataBarRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from reportlab.graphics.charts.barcharts import VerticalBarChart
@@ -27,9 +29,6 @@ PINE = colors.HexColor("#1e3a38")
 HEAD = colors.HexColor("#a9c4ee")
 SOFT = colors.HexColor("#eef1ea")
 LINE = colors.HexColor("#9aa9a3")
-OK = colors.HexColor("#3f7d3a")
-BAD = colors.HexColor("#c8501f")
-PRIO = {"Haute": colors.HexColor("#c0392b"), "Moyenne": colors.HexColor("#d9822b"), "Basse": colors.HexColor("#3f7d3a")}
 SERIES = [colors.HexColor("#1e3a38"), colors.HexColor("#c98a1b"), colors.HexColor("#5b8fd6")]
 
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -39,22 +38,6 @@ _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 def _fr(v: float, nd: int = 1) -> str:
     s = f"{v:,.{nd}f}".replace(",", "\u00a0").replace(".", ",")
     return s.rstrip("0").rstrip(",") if "," in s else s
-
-
-def _signed(v: float | None) -> str:
-    if v is None:
-        return "—"
-    if v == 0:
-        return "0"
-    return ("+" if v > 0 else "−") + _fr(abs(v))
-
-
-def _objective(o: dict | None) -> str:
-    if not o:
-        return "—"
-    if o["op"] == "between":
-        return f"{_fr(o['min'])}-{_fr(o['max'])} %"
-    return f"{'≥' if o['op'] == '>=' else '≤'} {_fr(o['value'])}"
 
 
 def _value(row: dict) -> str:
@@ -81,6 +64,24 @@ def _month_label(iso: str) -> str:
 
 def _period(report: Report) -> str:
     return f"{report['days']} jours" if report.get("days") else f"{report['months']} mois"
+
+
+def _nice_max(v: float) -> float:
+    """Plus petit « beau » maximum (1, 2, 2,5, 5 × 10^n) >= v : meme regle que l'interface (niceMax)."""
+    if v <= 0:
+        return 1
+    exp = 10 ** math.floor(math.log10(v))
+    f = v / exp
+    return (1 if f <= 1 else 2 if f <= 2 else 2.5 if f <= 2.5 else 5 if f <= 5 else 10) * exp
+
+
+def _scale(row: dict) -> float:
+    """Echelle propre a chaque indicateur (un pourcentage va de 0 a 100) : meme regle que l'interface."""
+    return 100 if row["unit"] == "%" else _nice_max(row["value"] * 1.2)
+
+
+def _scale_text(row: dict) -> str:
+    return f"échelle 0 – {_fr(_scale(row))}" + (" %" if row["unit"] == "%" else "")
 
 
 def _title(report: Report) -> str:
@@ -202,6 +203,18 @@ def _chart(chart: dict, labels: list[str], width: float) -> Drawing:
     return d
 
 
+def _hbar(row: dict, width: float) -> Drawing:
+    """Barre horizontale d'un indicateur, sur son echelle (comme OverviewChart dans l'interface)."""
+    d = Drawing(width, 0.8 * cm)
+    top = _scale(row)
+    share = max(0.0, min(1.0, row["value"] / top))
+    d.add(Rect(0, 0.42 * cm, width, 0.26 * cm, fillColor=colors.HexColor("#e6edf7"), strokeColor=None))
+    if share > 0:
+        d.add(Rect(0, 0.42 * cm, width * share, 0.26 * cm, fillColor=PINE, strokeColor=None))
+    d.add(String(0, 0.08 * cm, _scale_text(row), fontSize=6, fontName="Helvetica", fillColor=colors.HexColor("#4a5a54")))
+    return d
+
+
 def build_pdf(report: Report) -> bytes:
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.6 * cm, rightMargin=1.6 * cm,
@@ -218,31 +231,16 @@ def build_pdf(report: Report) -> bytes:
                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
     story += [banner]
 
-    # vue d'ensemble
+    # vue d'ensemble : indicateur, barre a echelle propre, valeur (comme l'interface)
     story.append(Paragraph("Vue d’ensemble du parc", S_SEC))
-    head = [_p(h, S_HEAD) for h in ("Indicateur", "Valeur", "Objectif", "Écart", "Statut")]
-    data = [head]
+    widths = [width * f for f in (0.40, 0.42, 0.18)]
+    data = [[_p(h, S_HEAD) for h in ("Indicateur", "Niveau", "Valeur")]]
     for r in report["overview"]:
-        if r["tone"] == "none":
-            statut = _p(r["statut"], S_HEAD)
-        else:
-            color = "#3f7d3a" if r["tone"] == "ok" else "#c8501f"
-            statut = Paragraph(f'<font color="{color}"><b>{_safe(r["statut"])}</b></font>', S_HEAD)
-        data.append([_p(fmt(r["label"])), _p(_value(r), S_CELL_R), _p(_objective(r["objective"]), S_CELL_R),
-                     _p(_signed(r["ecart"]), S_CELL_R), statut])
-    story.append(_grid(data, _widths(5, width, 0.38)))
-
-    # alertes
-    story.append(Paragraph("Alertes et actions recommandées", S_SEC))
-    if report["alerts"]:
-        data = [[_p(h, S_HEAD) for h in ("Priorité", "Alerte", "Action recommandée")]]
-        for a in report["alerts"]:
-            col = PRIO[a["priorite"]].hexval()[2:]
-            data.append([Paragraph(f'<font color="#{col}"><b>{a["priorite"]}</b></font>', S_HEAD),
-                         _p(fmt(a["alerte"])), _p(fmt(a["action"]))])
-        story.append(_grid(data, [width * 0.15, width * 0.42, width * 0.43]))
-    else:
-        story.append(_p("Aucune alerte : tous les indicateurs sont dans leurs objectifs.", S_NOTE))
+        data.append([_p(fmt(r["label"])), _hbar(r, widths[1] - 8), _p(_value(r), S_CELL_R)])
+    story.append(_grid(data, widths))
+    story.append(Spacer(1, 2))
+    story.append(_p("Chaque indicateur est tracé sur sa propre échelle : la longueur des barres ne se compare pas "
+                    "d’un indicateur à l’autre.", S_NOTE))
 
     # tableaux
     groups = [
@@ -280,8 +278,6 @@ def build_pdf(report: Report) -> bytes:
 X_HEAD = PatternFill("solid", fgColor="A9C4EE")
 X_BAND = PatternFill("solid", fgColor="1E3A38")
 X_TOTAL = PatternFill("solid", fgColor="DCE6F5")
-X_TONE = {"ok": Font(bold=True, color="3F7D3A"), "bad": Font(bold=True, color="C8501F")}
-X_PRIO = {"Haute": "C0392B", "Moyenne": "D9822B", "Basse": "3F7D3A"}
 THIN = Side(style="thin", color="9AA9A3")
 BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 _DEC = {"part": "0.0", "stock": "#,##0.###", "seuil": "#,##0.###", "manque": "#,##0.###", "anciennete": "0.0"}
@@ -346,7 +342,8 @@ def _xl_sheet(wb: Workbook, title: str, report: Report, heading: str | None = No
     ws["A1"].fill = X_BAND
     ws.merge_cells("A1:F1")
     ws.row_dimensions[1].height = 26
-    ws["A2"] = f"Édité le {date.fromisoformat(report['generated_at']).strftime('%d/%m/%Y')}"
+    ws["A2"] = (f"Édité le {date.fromisoformat(report['generated_at']).strftime('%d/%m/%Y')}"
+                f" · évolution sur {_period(report)}")
     ws["A2"].font = Font(italic=True, color="666666")
     return ws
 
@@ -360,39 +357,27 @@ def build_xlsx(report: Report) -> bytes:
     wb = Workbook()
     tables = {t["code"]: t for t in report["tables"]}
 
-    # --- Synthese : vue d'ensemble + alertes
+    # --- Synthese : vue d'ensemble
     ws = _xl_sheet(wb, "Synthèse", report, first=True)
     row = _xl_section(ws, 4, "Vue d’ensemble du parc")
-    _xl_header(ws, row, ["Indicateur", "Valeur", "Objectif", "Écart", "Statut"])
+    _xl_header(ws, row, ["Indicateur", "Valeur", "Échelle"])
     row += 1
     for r in report["overview"]:
         pct = r["unit"] == "%"
-        vals = [fmt(r["label"]), r["value"], _objective(r["objective"]), r["ecart"], r["statut"]]
-        for i, v in enumerate(vals, start=1):
+        for i, v in enumerate([fmt(r["label"]), r["value"], _scale(r)], start=1):
             c = ws.cell(row=row, column=i, value=v)
             c.border = BOX
-            c.alignment = Alignment(horizontal="left" if i == 1 else "right" if i < 5 else "center")
+            c.alignment = Alignment(horizontal="left" if i == 1 else "right")
         ws.cell(row=row, column=2).number_format = '0.0" %"' if pct else ("#,##0.0" if isinstance(r["value"], float) and not float(r["value"]).is_integer() else "#,##0")
-        ws.cell(row=row, column=4).number_format = '+0.0;-0.0;0' if isinstance(r["ecart"], float) else '+0;-0;0'
-        if r["tone"] in X_TONE:
-            ws.cell(row=row, column=5).font = X_TONE[r["tone"]]
+        ws.cell(row=row, column=3).number_format = '0.0" %"' if pct else "#,##0.###"
+        ws.cell(row=row, column=3).font = Font(italic=True, color="666666")
+        # barre de donnees = la barre horizontale de l'interface (0 -> echelle propre a l'indicateur)
+        ws.conditional_formatting.add(f"B{row}", DataBarRule(start_type="num", start_value=0, end_type="num",
+                                                              end_value=_scale(r), color="1E3A38", showValue=True))
         row += 1
-    _xl_widths(ws, [38, 16, 18, 12, 12])
-
-    # --- Alertes (feuille a part : colonnes de texte larges)
-    ws = _xl_sheet(wb, "Alertes", report)
-    row = _xl_section(ws, 4, "Alertes et actions recommandées")
-    _xl_header(ws, row, ["Priorité", "Alerte", "Action recommandée"])
-    row += 1
-    for a in report["alerts"] or [None]:
-        vals = ["", "Aucune alerte.", ""] if a is None else [a["priorite"], fmt(a["alerte"]), fmt(a["action"])]
-        for i, v in enumerate(vals, start=1):
-            c = ws.cell(row=row, column=i, value=v)
-            c.border, c.alignment = BOX, Alignment(wrap_text=True, vertical="top", horizontal="center" if i == 1 else "left")
-        if a:
-            ws.cell(row=row, column=1).font = Font(bold=True, color=X_PRIO[a["priorite"]])
-        row += 1
-    _xl_widths(ws, [12, 70, 60])
+    ws.cell(row=row + 1, column=1, value="Chaque indicateur est tracé sur sa propre échelle (colonne Échelle) : "
+                                          "la longueur des barres ne se compare pas d’un indicateur à l’autre.").font = Font(italic=True, size=9, color="666666")
+    _xl_widths(ws, [38, 16, 14])
 
     # --- Repartitions / Organisation / Stocks et licences
     for title, codes, widths in [

@@ -3,7 +3,7 @@ import { OverviewChart } from "../components/dashboard/OverviewChart";
 import { TimeChart } from "../components/dashboard/TimeChart";
 import {
   DEFAULT_PERIOD, downloadExport, PERIODS, periodKey, useDashboard,
-  type Cell, type DashTable, type Period, type Txt,
+  type Alert, type Cell, type DashTable, type Period, type Txt,
 } from "../lib/dashboard";
 import { ApiError } from "../lib/api";
 import { useI18n } from "../lib/i18n";
@@ -93,6 +93,10 @@ export default function Dashboard() {
           <div className={status === "loading" ? "dash-body is-stale" : "dash-body"} aria-busy={status === "loading"}>
             <Section title="Vue d’ensemble du parc">
               <OverviewChart rows={report.overview} label={f.txt} />
+            </Section>
+
+            <Section title="Alertes et actions recommandées">
+              <Card wide><AlertsTable alerts={report.alerts} f={f} /></Card>
             </Section>
 
             <Section title="Répartition du parc">
@@ -195,5 +199,31 @@ function DataTable({ table, f }: { table: DashTable; f: Fmt }) {
       )}
       {table.note && <p className="chart-note">{f.txt(table.note)}</p>}
     </>
+  );
+}
+
+const PRIORITY_CLASS: Record<Alert["priorite"], string> = { Haute: "high", Moyenne: "medium", Basse: "low" };
+
+/** Alertes et actions recommandées : même contenu et même ordre (par priorité) que les exports PDF / Excel. */
+function AlertsTable({ alerts, f }: { alerts: Alert[]; f: Fmt }) {
+  const { t } = f;
+  if (alerts.length === 0) return <p className="empty">{t("Aucune alerte : tous les indicateurs sont dans leurs objectifs.")}</p>;
+  return (
+    <div className="table-wrap">
+      <table className="table dash-table">
+        <thead>
+          <tr><th>{t("Priorité")}</th><th>{t("Alerte")}</th><th>{t("Action recommandée")}</th></tr>
+        </thead>
+        <tbody>
+          {alerts.map((a, i) => (
+            <tr key={i}>
+              <td><span className={`prio prio-${PRIORITY_CLASS[a.priorite]}`}>{t(a.priorite)}</span></td>
+              <td>{f.txt(a.alerte)}</td>
+              <td>{f.txt(a.action)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -18,8 +18,9 @@ Jours = Query(None, ge=dashboard_service.JOURS_MIN, le=dashboard_service.JOURS_M
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-def _attachment(content: bytes, media_type: str, ext: str) -> Response:
-    name = f"tableau-de-bord-parc-{date.today().isoformat()}.{ext}"
+def _attachment(content: bytes, media_type: str, ext: str, mois: int, jours: int | None) -> Response:
+    periode = f"{jours}j" if jours else f"{mois}m"  # la periode choisie dans l'interface figure dans le nom du fichier
+    name = f"tableau-de-bord-parc-{date.today().isoformat()}-{periode}.{ext}"
     return Response(content, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
@@ -30,9 +31,9 @@ async def get_dashboard(db: AsyncSession = Depends(get_db), mois: int = Mois, jo
 
 @router.get("/export.pdf")
 async def export_pdf(db: AsyncSession = Depends(get_db), mois: int = Mois, jours: int | None = Jours):
-    return _attachment(dashboard_export.build_pdf(await dashboard_service.build(db, mois, jours)), "application/pdf", "pdf")
+    return _attachment(dashboard_export.build_pdf(await dashboard_service.build(db, mois, jours)), "application/pdf", "pdf", mois, jours)
 
 
 @router.get("/export.xlsx")
 async def export_xlsx(db: AsyncSession = Depends(get_db), mois: int = Mois, jours: int | None = Jours):
-    return _attachment(dashboard_export.build_xlsx(await dashboard_service.build(db, mois, jours)), XLSX, "xlsx")
+    return _attachment(dashboard_export.build_xlsx(await dashboard_service.build(db, mois, jours)), XLSX, "xlsx", mois, jours)
