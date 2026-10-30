@@ -3,7 +3,9 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
 } from "react";
 import { api, getToken, setToken, setUnauthorizedHandler, type AuthUser } from "./api";
-import { AREA_ROLES, isRoleCode, PERMISSIONS, type Area, type Permission, type RoleCode } from "./access";
+import { AREA_PERMISSIONS, isRoleCode, LEGACY_PERMISSION, type Area, type Permission, type RoleCode } from "./access";
+
+const NO_PERMISSIONS: string[] = [];
 
 // loading : verification du jeton en cours (toujours l'etat initial : le rendu serveur n'a pas acces au jeton)
 export type AuthStatus = "loading" | "anon" | "authed";
@@ -16,7 +18,9 @@ type Auth = {
   logout: () => void;
   /** Modifie son propre nom d'utilisateur et/ou mot de passe (le mot de passe actuel est exige). Leve ApiError. */
   updateProfile: (input: ProfileInput) => Promise<void>;
-  can: (permission: Permission) => boolean;
+  permissions: string[]; // codes de permission du role (table role_permission)
+  has: (code: string) => boolean;
+  can: (permission: Permission) => boolean; // raccourcis read / write / delete du parc
   canView: (area: Area) => boolean;
 };
 
@@ -80,10 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Auth>(() => {
     const role = isRoleCode(user?.role_code) ? user.role_code : null;
+    const permissions = user?.permissions ?? NO_PERMISSIONS;
+    const has = (code: string) => permissions.includes(code);
     return {
-      status, user, role, login, logout, updateProfile,
-      can: (p) => role !== null && PERMISSIONS[role].includes(p),
-      canView: (a) => role !== null && AREA_ROLES[a].includes(role),
+      status, user, role, login, logout, updateProfile, permissions, has,
+      can: (p) => has(LEGACY_PERMISSION[p]),
+      canView: (a) => AREA_PERMISSIONS[a].some(has),
     };
   }, [status, user, login, logout, updateProfile]);
 

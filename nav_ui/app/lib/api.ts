@@ -21,6 +21,8 @@ export type AuthUser = {
   nom_utilisateur: string;
   role_id: number;
   role_code: string | null; // ADMIN, GESTIONNAIRE, LECTURE...
+  agent_id?: number | null;
+  permissions?: string[]; // codes de permission du role (RBAC)
   derniere_connexion?: string | null;
   cree_le?: string;
 };
@@ -114,7 +116,7 @@ export const api = {
   remove: (endpoint: string, id: string) => request<void>("DELETE", `/${endpoint}/${id}`),
   get: <T = Json>(path: string) => request<T>("GET", path),
   patch: <T = Json>(path: string, body: unknown) => request<T>("PATCH", path, body),
-  post: <T = Json>(path: string) => request<T>("POST", path),
+  post: <T = Json>(path: string, body?: unknown) => request<T>("POST", path, body),
   del: (path: string) => request<void>("DELETE", path),
   /** Envoi de fichier (multipart) : le navigateur fixe lui-meme le Content-Type. */
   upload: async <T = Json>(path: string, form: FormData): Promise<T> =>

@@ -9,7 +9,7 @@ import { sections } from "../lib/schema";
 
 export function Sidebar() {
   const { t, lang, setLang } = useI18n();
-  const { user, role, canView, logout } = useAuth();
+  const { user, role, canView, has, logout } = useAuth();
   const { groupsOf } = useMenu();
   const [collapsed, setCollapsed] = useState(false);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
@@ -34,11 +34,11 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav" aria-label={t("Navigation principale")}>
-        {canView("dashboard") && (
+        {has("dashboard.voir") && (
           <div className="nav-section">
             <ul>
               <li>
-                <NavLink to="/dashboard" className="nav-link" title={t("Tableau de bord")}>
+                <NavLink to="/dashboard" end className="nav-link" title={t("Tableau de bord")}>
                   <Icon name="dashboard" />
                   <span className="label">{t("Tableau de bord")}</span>
                 </NavLink>

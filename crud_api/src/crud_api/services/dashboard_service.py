@@ -492,3 +492,42 @@ def _fr_num(v: Any) -> Any:
     if float(v).is_integer():
         return f"{int(v):,}".replace(",", "\u00a0")
     return f"{v:,.1f}".replace(",", "\u00a0").replace(".", ",")
+
+
+async def repartition(db: AsyncSession) -> dict[str, Any]:
+    """Sous-onglet « Répartition » : par service, materiel detenu et agents par categorie du dictionnaire."""
+    from sqlalchemy import func
+
+    from crud_api.models import Affectation, Agent, CategorieMateriel, Materiel, Service
+
+    cats = (await db.execute(select(CategorieMateriel.code, CategorieMateriel.libelle).order_by(CategorieMateriel.id))).all()
+    services = (await db.execute(select(Service.id, Service.code, Service.nom).where(Service.actif.is_(True)).order_by(Service.nom))).all()
+    heads = dict((await db.execute(select(Agent.service_id, func.count()).where(Agent.actif.is_(True)).group_by(Agent.service_id))).all())
+    held = (await db.execute(
+        select(Agent.service_id, CategorieMateriel.code, Materiel.id, Agent.id)
+        .join(Affectation, Affectation.agent_id == Agent.id)
+        .join(Materiel, Materiel.id == Affectation.materiel_id)
+        .join(CategorieMateriel, CategorieMateriel.id == Materiel.categorie_id)
+        .where(Affectation.date_retour.is_(None))
+    )).all()
+    rows = [{"id": s.id, "code": s.code, "nom": s.nom} for s in services]
+    if any(sid is None or sid not in {s.id for s in services} for sid, *_ in held):
+        rows.append({"id": None, "code": "-", "nom": "Sans service"})
+    out_services = []
+    for s in rows:
+        mine = [h for h in held if h[0] == s["id"] or (s["id"] is None and h[0] not in {x.id for x in services})]
+        by_cat = {
+            code: {"nb_materiels": len({h[2] for h in mine if h[1] == code}), "nb_agents": len({h[3] for h in mine if h[1] == code})}
+            for code, _ in cats
+        }
+        out_services.append({**s, "nb_agents": heads.get(s["id"], 0), "nb_materiels": len({h[2] for h in mine}),
+                             "nb_agents_detenteurs": len({h[3] for h in mine}), "par_categorie": by_cat})
+    return {
+        "generated_at": date.today().isoformat(),
+        "categories": [
+            {"code": c, "libelle": lib, "nb_materiels": len({h[2] for h in held if h[1] == c}), "nb_agents": len({h[3] for h in held if h[1] == c})}
+            for c, lib in cats
+        ],
+        "services": out_services,
+        "total": {"nb_materiels": len({h[2] for h in held}), "nb_agents_detenteurs": len({h[3] for h in held})},
+    }

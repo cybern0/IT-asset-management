@@ -65,11 +65,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [rows, dispatch] = useReducer(reducer, undefined, init);
   const [status, setStatus] = useState<Status>("loading");
   const { t } = useI18n();
-  const { role } = useAuth();
+  const { role, permissions } = useAuth();
 
   /** Recharge des tables depuis l'API (seulement celles que le role a le droit de lire). Retourne le nombre d'echecs. */
   const loadTables = useCallback(async (tables: string[]): Promise<number> => {
-    const allowed = tables.filter((table) => role !== null && canReadTable(role, table));
+    const allowed = tables.filter((table) => role !== null && canReadTable(permissions, table));
     const results = await Promise.allSettled(
       allowed.map(async (table) => {
         const data = await api.list(tableEndpoint[table]);
@@ -78,7 +78,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }),
     );
     return results.filter((r) => r.status === "rejected").length;
-  }, [role]);
+  }, [role, permissions]);
 
   const reload = useCallback(async () => {
     setStatus("loading");

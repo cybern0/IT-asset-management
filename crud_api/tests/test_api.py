@@ -260,16 +260,20 @@ async def test_authorization_by_role(client, monkeypatch):
         assert (await client.get("/auth/me", headers=auth)).json()["role_code"] == code
         return auth
 
+    # Agent standard : ne voit que la repartition ; aucun acces au parc, aux comptes ni a l'audit
     lec = await login("lec", "LECTURE")
-    assert (await client.get("/materiels", headers=lec)).status_code == 200
-    assert (await client.get("/agents", headers=lec)).status_code == 200
+    assert (await client.get("/dashboard/repartition", headers=lec)).status_code == 200
+    assert (await client.get("/dashboard", headers=lec)).status_code == 403
+    assert (await client.get("/materiels", headers=lec)).status_code == 403
+    assert (await client.get("/agents", headers=lec)).status_code == 403
     assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "X"}, headers=lec)).status_code == 403
-    assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=lec)).status_code == 403
     assert (await client.get("/utilisateurs", headers=lec)).status_code == 403
 
+    # Gestionnaire d'activite : approuve la reception ; ne touche ni au parc ni aux comptes
     ges = await login("ges", "GESTIONNAIRE")
-    assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "PC 2"}, headers=ges)).status_code == 200
-    assert (await client.delete(f"/materiels/{m['id']}", headers=ges)).status_code == 403
+    assert (await client.get("/dashboard/repartition", headers=ges)).status_code == 200
+    assert (await client.get("/materiels", headers=ges)).status_code == 403
+    assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "PC 2"}, headers=ges)).status_code == 403
     assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=ges)).status_code == 403
     assert (await client.get("/utilisateurs", headers=ges)).status_code == 403
     assert (await client.get("/journal-audit", headers=ges)).status_code == 403

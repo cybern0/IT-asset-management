@@ -1,41 +1,41 @@
-// Droits d'acces : UN SEUL endroit a modifier pour changer qui voit / fait quoi.
-// Les codes de role sont ceux de la table `role` (parc_4.sql). Cote serveur, les memes regles
-// sont appliquees dans crud_api/routers/__init__.py : ce fichier ne sert qu'a adapter l'interface.
+// Droits d'acces (RBAC modulaire) : l'API renvoie la liste des PERMISSIONS du role (/auth/login, /auth/me, table
+// role_permission de parc_10.sql). L'interface se contente de les lire : changer les droits d'un role = modifier
+// la base, pas ce fichier. Cote serveur, les memes permissions sont verifiees route par route.
 
 export type RoleCode = "ADMIN" | "GESTIONNAIRE" | "LECTURE";
+/** Raccourcis historiques des composants (CrudPanel...) : lecture / ecriture / suppression du parc. */
 export type Permission = "read" | "write" | "delete";
-export type Area = "dashboard" | "assets" | "administration";
+export type Area = "dashboard" | "circuit" | "assets" | "administration";
 
 export const ROLE_LABEL: Record<RoleCode, string> = {
-  ADMIN: "Administrateur",
-  GESTIONNAIRE: "Gestionnaire",
-  LECTURE: "Standard (lecture seule)",
+  ADMIN: "Dépositaire comptable (administrateur)",
+  GESTIONNAIRE: "Gestionnaire d’activité",
+  LECTURE: "Agent (utilisateur standard)",
 };
 
-/** Ce que chaque role a le droit de faire. */
-export const PERMISSIONS: Record<RoleCode, Permission[]> = {
-  ADMIN: ["read", "write", "delete"],
-  GESTIONNAIRE: ["read", "write"],
-  LECTURE: ["read"], // standard : lecture seule
+export const LEGACY_PERMISSION: Record<Permission, string> = {
+  read: "parc.lire", write: "parc.ecrire", delete: "parc.supprimer",
 };
 
-/** Roles qui voient chaque zone du menu (et peuvent ouvrir ses pages). */
-export const AREA_ROLES: Record<Area, RoleCode[]> = {
-  dashboard: ["ADMIN", "GESTIONNAIRE", "LECTURE"],
-  assets: ["ADMIN", "GESTIONNAIRE", "LECTURE"],
-  administration: ["ADMIN"],
+/** Permissions dont UNE SEULE suffit pour voir chaque zone du menu. */
+export const AREA_PERMISSIONS: Record<Area, string[]> = {
+  dashboard: ["dashboard.voir", "dashboard.repartition"],
+  circuit: ["demande.creer", "demande.voir_propres", "demande.voir_service", "demande.voir_toutes", "dashboard.repartition"],
+  assets: ["parc.lire"],
+  administration: ["acces.gerer"],
 };
 
-/** Tables que seul l'administrateur peut meme lire (comptes, droits, journal). */
-const ADMIN_ONLY_TABLES = new Set(["utilisateur", "role", "permission", "journal_audit"]);
+const ADMIN_ONLY_TABLES = new Set(["utilisateur", "role", "permission"]);
 
-export const isRoleCode = (v: unknown): v is RoleCode => typeof v === "string" && v in PERMISSIONS;
+export const isRoleCode = (v: unknown): v is RoleCode => v === "ADMIN" || v === "GESTIONNAIRE" || v === "LECTURE";
 
-export const canReadTable = (role: RoleCode, table: string): boolean =>
-  role === "ADMIN" || !ADMIN_ONLY_TABLES.has(table);
+export const canReadTable = (permissions: readonly string[], table: string): boolean =>
+  table === "journal_audit" ? permissions.includes("audit.lire")
+    : ADMIN_ONLY_TABLES.has(table) ? permissions.includes("acces.gerer")
+    : permissions.includes("parc.lire");
 
 /** Zone du menu correspondant a une URL (null pour /, /login...). */
 export function areaOf(pathname: string): Area | null {
   const first = pathname.split("/")[1] ?? "";
-  return (Object.keys(AREA_ROLES) as Area[]).find((a) => a === first) ?? null;
+  return (Object.keys(AREA_PERMISSIONS) as Area[]).find((a) => a === first) ?? null;
 }

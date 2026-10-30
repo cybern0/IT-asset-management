@@ -9,11 +9,13 @@ from crud_api.config import get_settings
 from crud_api.core.database import get_db
 from crud_api.core.errors import ForbiddenError, UnauthorizedError
 from crud_api.core.security import decode_access_token
-from crud_api.models import Role, Utilisateur
+from crud_api.models import Permission, Role, Utilisateur, role_permission
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-# Codes de la table `role` (parc_4.sql). LECTURE = utilisateur « standard », en lecture seule.
+# Codes de la table `role` (parc_4.sql, libelles mis a jour par parc_10.sql) :
+#   ADMIN = depositaire comptable, GESTIONNAIRE = gestionnaire d'activite (chef de service), LECTURE = agent standard.
+# Les DROITS ne sont plus codes ici : ils viennent des tables permission / role_permission (parc_10.sql).
 ADMIN = "ADMIN"
 GESTIONNAIRE = "GESTIONNAIRE"
 LECTURE = "LECTURE"
@@ -78,6 +80,76 @@ def require_roles(*, read: frozenset[str], write: frozenset[str], delete: frozen
         else:
             allowed = write
         if await role_code_of(db, user) not in allowed:
+            raise ForbiddenError("Votre rôle ne permet pas d'effectuer cette action.")
+
+    return checker
+
+
+# ----------------------------- RBAC modulaire : droits lus en base (permission / role_permission) -----------------------------
+async def permissions_of(db: AsyncSession, user: Utilisateur) -> frozenset[str]:
+    """Codes de permission du role de l'utilisateur. Changer les droits d'un role = modifier role_permission."""
+    rows = await db.scalars(
+        select(Permission.code)
+        .join(role_permission, role_permission.c.permission_id == Permission.id)
+        .where(role_permission.c.role_id == user.role_id)
+    )
+    return frozenset(rows.all())
+
+
+class Principal:
+    """Utilisateur connecte et ses permissions. `user` vaut None quand AUTH_ENABLED=false : tout est alors permis."""
+
+    def __init__(self, user: Utilisateur | None, perms: frozenset[str]):
+        self.user = user
+        self.perms = perms
+
+    @property
+    def open(self) -> bool:
+        return self.user is None
+
+    @property
+    def agent_id(self) -> int | None:
+        return self.user.agent_id if self.user else None
+
+    def has(self, code: str) -> bool:
+        return self.open or code in self.perms
+
+    def has_any(self, *codes: str) -> bool:
+        return self.open or any(c in self.perms for c in codes)
+
+
+async def get_principal(
+    user: Utilisateur | None = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> Principal:
+    if user is None:
+        return Principal(None, frozenset())
+    return Principal(user, await permissions_of(db, user))
+
+
+def requires(*codes: str):
+    """Dependance : exige AU MOINS UNE des permissions donnees (403 sinon) et renvoie le Principal."""
+
+    async def checker(principal: Principal = Depends(get_principal)) -> Principal:
+        if not principal.has_any(*codes):
+            raise ForbiddenError("Votre rôle ne permet pas d'effectuer cette action.")
+        return principal
+
+    return checker
+
+
+def require_perms(*, read: frozenset[str], write: frozenset[str], delete: frozenset[str] | None = None):
+    """Comme require_roles, mais par permissions : lecture (GET), ecriture (POST/PATCH...), suppression (DELETE).
+    Chaque ensemble liste les permissions dont UNE SEULE suffit. `delete` vaut `write` s'il est omis."""
+    delete_perms = write if delete is None else delete
+
+    async def checker(request: Request, principal: Principal = Depends(get_principal)) -> None:
+        if request.method in SAFE_METHODS:
+            allowed = read
+        elif request.method == "DELETE":
+            allowed = delete_perms
+        else:
+            allowed = write
+        if not principal.has_any(*allowed):
             raise ForbiddenError("Votre rôle ne permet pas d'effectuer cette action.")
 
     return checker

@@ -37,6 +37,29 @@ def etape_of(f: FicheDetention) -> int:
     return 5
 
 
+def phase_of(f: FicheDetention) -> str:
+    """Phase du circuit de demande (meme logique que la vue SQL v_circuit_demande). Tolere les dossiers du circuit
+    historique : valide_par vaut approbation, statut SIGNEE vaut les deux signatures, une affectation vaut remise."""
+    signed = f.statut == "SIGNEE"
+    if f.cloture:
+        return "CLOTUREE"
+    if not (f.approuve_le or f.valide_par) or f.materiel_id is None:
+        return "A_APPROUVER"
+    if not (f.signature_agent_le or signed):
+        return "A_SIGNER_AGENT"
+    if not (f.signature_chef_le or signed):
+        return "A_SIGNER_CHEF"
+    if not (f.date_remise or f.affectation_id):
+        return "A_REMETTRE"
+    return "TERMINEE" if f.reception_approuvee_le else "A_APPROUVER_RECEPTION"
+
+
+ROLE_ATTENDU = {
+    "A_APPROUVER": "ADMIN", "A_SIGNER_AGENT": "LECTURE", "A_SIGNER_CHEF": "GESTIONNAIRE",
+    "A_REMETTRE": "ADMIN", "A_APPROUVER_RECEPTION": "GESTIONNAIRE",
+}
+
+
 def etat_of(f: FicheDetention, a: Affectation | None) -> str:
     if f.cloture:
         return f.cloture
@@ -88,6 +111,10 @@ def _flat(row) -> dict[str, Any]:
         "materiel_provenance": m.provenance if m else None,
         "materiel_provenance_detail": m.provenance_detail if m else None,
         "materiel_date_acquisition": m.date_acquisition if m else None,
+        "type_demande": f.type_demande, "ancien_agent_id": f.ancien_agent_id, "phase": phase_of(f), "role_attendu": ROLE_ATTENDU.get(phase_of(f)),
+        "approuve_le": f.approuve_le, "motif_refus": f.motif_refus, "signature_agent_le": f.signature_agent_le,
+        "signature_chef_le": f.signature_chef_le, "reception_approuvee_le": f.reception_approuvee_le,
+        "agent_service_id": s.id if s else None, "chef_agent_id": s.chef_agent_id if s else None,
         "agent_id": ag.id, "agent_matricule": ag.matricule, "agent_nom": ag.nom, "agent_prenom": ag.prenom,
         "agent_fonction": ag.fonction, "agent_email": ag.email,
         "agent_telephone": f.telephone or ag.telephone, "agent_whatsapp": f.whatsapp or ag.whatsapp,
@@ -122,6 +149,10 @@ async def _fiche(db: AsyncSession, fiche_id: int) -> FicheDetention:
     if fiche is None:
         raise NotFoundError("Dossier d’attribution introuvable.")
     return fiche
+
+
+def _dt(d: date | None) -> datetime | None:
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc) if d else None
 
 
 def _not_closed(f: FicheDetention) -> None:
@@ -308,7 +339,8 @@ async def attach_or_create(db: AsyncSession, a: Affectation) -> FicheDetention:
         affectation_id=a.id, categorie_id=m.categorie_id if m else None,
         besoin="Régularisation (affectation saisie hors circuit de demande)", date_demande=a.date_remise,
         valide_par=REGULARISATION, date_validation=a.date_remise, date_generation=a.date_remise,
-        date_remise=a.date_remise,
+        date_remise=a.date_remise, approuve_le=_dt(a.date_remise), signature_agent_le=_dt(a.date_remise),
+        signature_chef_le=_dt(a.date_remise), reception_approuvee_le=_dt(a.date_remise),
         etat_constate=a.etat_remise if a.etat_remise in ("NEUF", "BON", "A_REPARER") else None,
     )
     db.add(fiche)

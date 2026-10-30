@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { Navigate } from "react-router";
+import { DashTabs } from "../components/dashboard/DashTabs";
+import { useAuth } from "../lib/auth";
 import { OverviewChart } from "../components/dashboard/OverviewChart";
 import { TimeChart } from "../components/dashboard/TimeChart";
 import {
@@ -31,7 +34,13 @@ function useFormat() {
 
 type Fmt = ReturnType<typeof useFormat>;
 
+/** Le depositaire comptable voit la vue d'ensemble ; les autres roles arrivent directement sur la repartition. */
 export default function Dashboard() {
+  const { has } = useAuth();
+  return has("dashboard.voir") ? <Overview /> : <Navigate to="/circuit/repartition/repartition" replace />;
+}
+
+function Overview() {
   const { t } = useI18n();
   const f = useFormat();
   const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
@@ -53,6 +62,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <DashTabs />
       <header className="page-head dash-head">
         <div>
           <h1>{t("Tableau de bord")}</h1>

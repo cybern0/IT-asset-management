@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from crud_api.core.deps import ADMIN, GESTIONNAIRE, LECTURE, get_current_user, require_roles
-from crud_api.routers import audit, auth, dashboard, fiches
+from crud_api.core.deps import get_current_user, require_perms, requires
+from crud_api.routers import audit, auth, circuit, dashboard, fiches
 from crud_api.routers.crud import crud_router
 from crud_api.schemas import consommable as c
 from crud_api.schemas import logiciel as lg
@@ -21,17 +21,15 @@ auth_router = auth.router
 # Toutes les autres routes passent par get_current_user (ouvert tant que AUTH_ENABLED=false)
 api_router = APIRouter(dependencies=[Depends(get_current_user)])
 
-# Autorisation par role. L'interface (nav_ui/app/lib/access.ts) applique les memes regles a l'ecran.
-#   ADMIN        : tout
-#   GESTIONNAIRE : lecture + creation/modification du parc ; ni suppression, ni administration
-#   LECTURE      : lecture seule (standard)
-_EVERYONE = frozenset({ADMIN, GESTIONNAIRE, LECTURE})
-_STAFF = frozenset({ADMIN, GESTIONNAIRE})
-_ADMINS = frozenset({ADMIN})
+# Autorisation par PERMISSIONS (tables permission / role_permission, parc_10.sql) : changer les droits d'un role ne
+# demande aucune modification du code. L'interface recoit la liste des permissions (/auth/login, /auth/me).
+def _p(*codes: str) -> frozenset[str]:
+    return frozenset(codes)
 
-_assets = Depends(require_roles(read=_EVERYONE, write=_STAFF, delete=_ADMINS))  # materiel, stocks, logiciels...
-_organisation = Depends(require_roles(read=_EVERYONE, write=_ADMINS))  # agents, services : lus partout, geres par l'admin
-_admin_only = Depends(require_roles(read=_ADMINS, write=_ADMINS))  # comptes, roles, permissions, journal d'audit
+
+_assets = Depends(require_perms(read=_p("parc.lire"), write=_p("parc.ecrire"), delete=_p("parc.supprimer")))  # materiel, stocks, logiciels...
+_organisation = Depends(require_perms(read=_p("parc.lire"), write=_p("parc.ecrire")))  # agents, services
+_admin_only = Depends(require_perms(read=_p("acces.gerer"), write=_p("acces.gerer")))  # comptes, roles, permissions
 _policy = {
     "/directions": _organisation, "/services": _organisation, "/agents": _organisation,
     "/utilisateurs": _admin_only, "/roles": _admin_only, "/permissions": _admin_only,
@@ -64,8 +62,6 @@ for prefix, tag, service, create, update, out, immutable in _resources:
     )
 
 api_router.include_router(fiches.router, dependencies=[_assets])
-api_router.include_router(
-    dashboard.router, prefix="/dashboard", tags=["Tableau de bord"],
-    dependencies=[Depends(require_roles(read=_EVERYONE, write=_ADMINS))],
-)
-api_router.include_router(audit.router, prefix="/journal-audit", tags=["Journal d'audit"], dependencies=[_admin_only])
+api_router.include_router(circuit.router)  # circuit de demande : droits verifies route par route
+api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Tableau de bord"])  # droits par route
+api_router.include_router(audit.router, prefix="/journal-audit", tags=["Journal d'audit"], dependencies=[Depends(require_perms(read=_p("audit.lire"), write=_p("audit.lire")))])

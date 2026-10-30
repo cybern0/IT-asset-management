@@ -25,6 +25,7 @@ class ServiceCreate(BaseModel):
     code: S(30)
     nom: S(180)
     site: OptS(150) = None
+    chef_agent_id: int | None = None  # chef de service (parc_10.sql)
     actif: bool = True
 
 
@@ -37,6 +38,7 @@ class ServiceOut(ORMModel):
     code: str
     nom: str
     site: str | None
+    chef_agent_id: int | None
     actif: bool
 
 

@@ -478,3 +478,25 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 .profile-card .form-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .hint { color: var(--muted); font-size: 13px; }
 .profile-card .fieldset { display: grid; gap: 12px; }
+
+/* --- Demandes (circuit) et sous-onglets du tableau de bord (classes propres : ne pas reutiliser .grid, .panel) --- */
+.dash-tabs { flex: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.dash-tabs a { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); text-decoration: none; color: var(--ink); font-weight: 600; }
+.dash-tabs a.active { background: var(--pine); color: #fff; border-color: var(--pine); }
+.rep-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; }
+.rep-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.rep-chart { overflow-x: auto; }
+.rep-chart .chart-svg { min-width: 560px; }
+.rq-body { display: grid; gap: 18px; padding-bottom: 16px; min-width: 0; align-content: start; }
+.rq-body .notice-box { display: grid; gap: 8px; justify-items: start; }
+.rq-body .dash-card.table-wrap { max-width: 100%; }
+.rq-table th, .rq-table td { padding: 9px 12px; }
+.rq-table td:last-child { min-width: 200px; }
+.rq-links { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
+.rq-links li { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.rq-form { display: grid; gap: 12px; max-width: 520px; padding: 4px 0; }
+.rq-form textarea { width: 100%; }
+.rq-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rq-actions select { max-width: 240px; padding: 7px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
+.rq-table td { vertical-align: top; }
+.rq-table small { color: var(--muted); }

@@ -62,7 +62,9 @@ export type Entity = {
   /** Pas de bouton + (la creation passe par un autre circuit, ex. Attributions). */
   noCreate?: boolean;
   /** Onglet a ecran dedie (au lieu du CRUD generique). */
-  custom?: "attributions";
+  custom?: "attributions" | "demandes" | "repartition";
+  /** Permission (code role_permission) exigee pour voir cet onglet ; sans elle, l'onglet est masque. */
+  needs?: string;
   readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
   immutable?: boolean; // creation seulement (ex. mouvements de stock)
   validate?: (
@@ -85,6 +87,8 @@ export type Group = {
   description: string;
   icon: IconName;
   kind?: "crud" | "global";
+  /** Permission exigee pour voir ce menu (voir Entity.needs). */
+  needs?: string;
   /** Valeur de categorie_materiel.category_menu dont les categories alimentent ce menu (onglets generes). */
   categoryMenu?: CategoryMenu;
   /** Onglets de categories places avant les onglets fixes (par defaut : apres). */
@@ -93,7 +97,7 @@ export type Group = {
 };
 
 export type Section = {
-  slug: "assets" | "administration";
+  slug: "assets" | "circuit" | "administration";
   label: string;
   groups: Group[];
 };
@@ -231,13 +235,23 @@ export function categoryTabOf(code: string, categories: Row[]): { groupSlug: str
 }
 
 /* Attributions (processus en étapes) puis Affectations (historique) : menu propre, en tête de la section Assets. */
+/* Section « Demandes et attributions » : circuit de demande (agent -> dépositaire comptable -> signatures -> réception). */
+const demandesTab: Entity = {
+  key: "demandes", label: "Demandes de matériel", singular: "une demande", table: "affectation",
+  custom: "demandes", titleFields: ["id"], fields: [],
+};
+const repartitionTab: Entity = {
+  key: "repartition", label: "Répartition", singular: "une répartition", table: "affectation",
+  custom: "repartition", titleFields: ["id"], fields: [],
+};
+
 const attribution: Entity[] = [
   ent({
     key: "attributions", label: "Attributions", singular: "une attribution", table: "affectation",
-    custom: "attributions", titleFields: ["id"], fields: [],
+    custom: "attributions", titleFields: ["id"], fields: [], needs: "parc.lire",
   }),
   ent({
-    key: "affectations", label: "Affectations", singular: "une affectation", table: "affectation",
+    key: "affectations", label: "Affectations", singular: "une affectation", table: "affectation", needs: "parc.lire",
     titleFields: ["materiel_id"], subtitleFields: ["agent_id"],
     badgeFn: (r) => (r.date_retour ? "Rendue" : "Active"),
     extras: ["fiche"],
@@ -390,6 +404,7 @@ const organisation: Entity[] = [
       text("code", "Code", { required: true, unique: true }),
       text("nom", "Nom", { required: true }),
       text("site", "Site"),
+      ref("chef_agent_id", "Chef de service", "agent"),
       actif(),
     ],
     seed: [{ id: "s1", direction_id: "d1", code: "SI", nom: "Service informatique", site: "Siège", actif: "true" }],
@@ -518,12 +533,27 @@ export const sections: Section[] = [
     slug: "assets",
     label: "Assets",
     groups: [
-      { slug: "attribution", label: "Attributions et affectations", icon: "users", description: "Dossiers d’attribution du matériel aux agents, puis historique des affectations et retours.", entities: attribution },
       { slug: "materiel", label: "Matériel", icon: "monitor", categoryMenu: "Matériel", categoriesFirst: true, description: "Matériel individualisé, un onglet par catégorie.", entities: [] },
       { slug: "reseau", label: "Réseau et baies", icon: "network", categoryMenu: "Réseau", categoriesFirst: true, description: "Équipements réseau, baies, câblage, cartes SIM : même table matériel, une catégorie par onglet.", entities: [] },
       { slug: "consommables", label: "Consommables et stocks", icon: "printer", categoryMenu: "Consommables et stocks", description: "Articles, stocks par service et mouvements d’entrée, sortie et transfert.", entities: consommables },
       { slug: "logiciels", label: "Logiciels", icon: "layers", categoryMenu: "Logiciels", description: "Logiciels installés et licences associées.", entities: logiciels },
       { slug: "global", label: "Global", icon: "globe", kind: "global", description: "Recherche dans tout le matériel et liste croisée matériel × agent détenteur, avec fiches de détention.", entities: [] },
+    ],
+  },
+  {
+    slug: "circuit",
+    label: "Demandes et attributions",
+    groups: [
+      {
+        slug: "attribution", label: "Demandes et attributions", icon: "users",
+        description: "Demande de matériel, approbation, signatures (agent puis chef de service), remise et réception ; dossiers d’attribution et historique des affectations.",
+        entities: [demandesTab, ...attribution],
+      },
+      {
+        slug: "repartition", label: "Répartition", icon: "layers", needs: "dashboard.repartition",
+        description: "Matériel détenu par service, avec le nombre d’agents et de matériels par catégorie du dictionnaire.",
+        entities: [repartitionTab],
+      },
     ],
   },
   {

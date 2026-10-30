@@ -1,7 +1,9 @@
 import { Navigate, NavLink, useLocation, useParams } from "react-router";
 import { AttributionsView } from "../components/AttributionsView";
 import { CrudPanel } from "../components/CrudPanel";
+import { DemandesView } from "../components/DemandesView";
 import { GlobalView } from "../components/GlobalView";
+import { RepartitionView } from "../components/RepartitionView";
 import { useI18n } from "../lib/i18n";
 import { useMenu } from "../lib/menu";
 import { rowsFor, sections } from "../lib/schema";
@@ -58,6 +60,8 @@ export default function Module() {
             </p>
           )}
           {entity?.custom === "attributions" && <AttributionsView />}
+          {entity?.custom === "demandes" && <DemandesView />}
+          {entity?.custom === "repartition" && <RepartitionView />}
           {entity && !entity.custom && <CrudPanel key={entity.key} entity={entity} />}
         </>
       )}

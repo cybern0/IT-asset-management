@@ -21,6 +21,8 @@ class Service(IdMixin, Base):
     code: Mapped[str] = mapped_column(String(30), unique=True)
     nom: Mapped[str] = mapped_column(String(180))
     site: Mapped[str | None] = mapped_column(String(150))
+    # chef de service (parc_10.sql) : signe les fiches et approuve la reception pour son service
+    chef_agent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("agent.id"))
     actif: Mapped[bool] = mapped_column(Boolean, server_default=true())
 
 

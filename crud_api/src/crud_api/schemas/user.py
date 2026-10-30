@@ -58,6 +58,7 @@ class UserOut(ORMModel):
     derniere_connexion: datetime | None
     cree_le: datetime
     role_code: str | None = None  # renseigne par /auth/login et /auth/me (ADMIN, GESTIONNAIRE, LECTURE)
+    permissions: list[str] = Field(default_factory=list)  # codes de permission du role (RBAC), pour adapter l'interface
 
 
 class LoginIn(BaseModel):

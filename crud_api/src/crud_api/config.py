@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Nom de la structure imprime sur les fiches de detention (PDF)
     structure_name: str = ""
 
+    # Notifications sans serveur (liens mailto:, sms:, wa.me) : adresse publique de l'interface et indicatif pays
+    app_url: str = ""  # ex. https://parc.exemple.mg ; ajoute un lien vers la demande dans les messages
+    country_code: str = "261"  # indicatif ajoute aux numeros locaux commencant par 0 (261 = Madagascar)
+
     # Tableau de bord : objectifs et seuils (les statuts OK / Alerte en decoulent)
     objectif_attribution_min: float = 75  # taux d'attribution cible, en %
     objectif_attribution_max: float = 85

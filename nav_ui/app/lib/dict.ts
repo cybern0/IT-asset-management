@@ -635,6 +635,39 @@ const B: [string, string, string][] = [
   ["Inventory", "Inventaire", "Fanisana entana"],
 ];
 
+
+// Circuit de demande et répartition (français, anglais, malgache : à faire relire par un locuteur natif)
+const C: [string, string, string][] = [
+  ["Demandes de matériel", "Equipment requests", "Fangatahana fitaovana"],
+  ["Attribution : matériel non affecté", "Allocation: unassigned equipment", "Fanomezana: fitaovana tsy voatendry"],
+  ["Affectation : reprendre un matériel détenu par un autre agent", "Assignment: take equipment held by another agent", "Fanendrena: maka fitaovana ambany tanan'ny mpiasa hafa"],
+  ["Affectation (transfert)", "Assignment (transfer)", "Fanendrena (famindrana)"],
+  ["Retiré à", "Taken from", "Nalaina tamin'i"],
+  ["détenu par", "held by", "tanan'i"],
+  ["Demandes et attributions", "Requests and allocations", "Fangatahana sy fanomezana"],
+  ["Nouvelle demande", "New request", "Fangatahana vaovao"],
+  ["Envoyer la demande", "Send request", "Alefa ny fangatahana"],
+  ["Répartition", "Distribution", "Fizarana"],
+  ["Vue d’ensemble", "Overview", "Topimaso ankapobeny"],
+  ["Répartition du matériel", "Equipment distribution", "Fizaran'ny fitaovana"],
+  ["Matériels par service", "Equipment by department", "Fitaovana isaky ny sampana"],
+  ["Approuver", "Approve", "Ankatoavina"],
+  ["Refuser", "Refuse", "Lavina"],
+  ["Signer", "Sign", "Sonia"],
+  ["Approuver la réception", "Approve reception", "Ankatoavina ny fandraisana"],
+  ["Enregistrer la remise", "Record handover", "Hanoratra ny fanendrena"],
+  ["Attribution", "Allocation", "Fanomezana"],
+  ["Affectation", "Assignment", "Fanendrena"],
+  ["Terminée", "Completed", "Vita"],
+  ["Refusée", "Refused", "Nolavina"],
+  ["À approuver", "To approve", "Ho ankatoavina"],
+  ["Mes notifications", "My notifications", "Ny fampandrenesana ahy"],
+  ["Gestionnaire d’activité", "Activity manager", "Mpitantana asa"],
+  ["Agent (utilisateur standard)", "Agent (standard user)", "Mpiasa (mpampiasa mahazatra)"],
+  ["Dépositaire comptable (administrateur)", "Accounting custodian (administrator)", "Mpitahiry kaontabilite (mpitantana)"],
+];
+for (const [fr, en, mg] of C) { A.push([fr, en, mg]); }
+
 export const dict: Record<Lang, Record<string, string>> = { fr: {}, en: {}, mg: {} };
 for (const [fr, en, mg] of A) { dict.en[fr] = en; dict.mg[fr] = mg; }
 for (const [en, fr, mg] of B) { dict.fr[en] = fr; dict.mg[en] = mg; }
