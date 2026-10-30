@@ -90,6 +90,8 @@ def _flat(row) -> dict[str, Any]:
         "materiel_date_acquisition": m.date_acquisition if m else None,
         "agent_id": ag.id, "agent_matricule": ag.matricule, "agent_nom": ag.nom, "agent_prenom": ag.prenom,
         "agent_fonction": ag.fonction, "agent_email": ag.email,
+        "agent_telephone": f.telephone or ag.telephone, "agent_whatsapp": f.whatsapp or ag.whatsapp,
+        "agent_adresse_domicile_exacte": f.adresse_domicile_exacte or ag.adresse_domicile_exacte,
         "service_nom": s.nom if s else None, "service_site": s.site if s else None,
         "direction_nom": d.nom if d else None,
     }

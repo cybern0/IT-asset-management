@@ -1,5 +1,5 @@
 # Direction -> Service -> Agent
-from sqlalchemy import BigInteger, Boolean, ForeignKey, String, true
+from sqlalchemy import BigInteger, Boolean, ForeignKey, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crud_api.core.database import Base
@@ -32,5 +32,8 @@ class Agent(IdMixin, Base):
     prenom: Mapped[str] = mapped_column(String(100))
     fonction: Mapped[str | None] = mapped_column(String(150))
     email: Mapped[str | None] = mapped_column(String(180))
+    telephone: Mapped[str | None] = mapped_column(String(30))
+    whatsapp: Mapped[str | None] = mapped_column(String(30))
+    adresse_domicile_exacte: Mapped[str | None] = mapped_column(Text)
     service_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("service.id"))
     actif: Mapped[bool] = mapped_column(Boolean, server_default=true())

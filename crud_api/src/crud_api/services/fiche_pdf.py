@@ -171,6 +171,14 @@ def _info_detenteur(d: dict[str, Any]) -> list[str]:
     return [" · ".join(x for x in (d["agent_fonction"], d["agent_email"]) if x)]
 
 
+def _contact(d: dict[str, Any]) -> str:
+    """Telephone et WhatsApp sur une seule ligne (la fiche doit tenir sur une page)."""
+    tel, wa = (d.get("agent_telephone") or "").strip(), (d.get("agent_whatsapp") or "").strip()
+    if tel and wa:
+        return f"{tel}  ·  WhatsApp : {wa}"
+    return f"WhatsApp : {wa}" if wa else tel
+
+
 def _info_attribution(d: dict[str, Any]) -> list[str]:
     """Remise (etat constate, observations) puis demande et validation : sous la date d'attribution."""
     remise = []
@@ -223,7 +231,7 @@ def _kv(rows: list[tuple[str, Any]]) -> Table:
         ("BACKGROUND", (0, 0), (0, -1), LABEL_BG),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.8), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.8),
     ]))
     return t
 
@@ -303,6 +311,8 @@ def build_pdf(d: dict[str, Any], structure_name: str = "", types: list[tuple[str
         ("Nom et prénom", _value(nom, 48, sub=_info_detenteur(d))),
         ("Service / Direction", _value(service, 48)),
         ("Matricule / Identifiant", _value(d["agent_matricule"], 48)),
+        ("Téléphone / WhatsApp", _value(_contact(d), 48)),
+        ("Adresse du domicile", _value(d.get("agent_adresse_domicile_exacte"), 48)),
         ("Site / Localisation / Bureau", _value(lieu, 48)),
         ("Date d’attribution", _value(_fr(d["date_remise"]), 48, sub=_info_attribution(d))),
     ])]

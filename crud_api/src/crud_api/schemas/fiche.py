@@ -118,6 +118,9 @@ class AttributionOut(ORMModel):
     agent_prenom: str
     agent_fonction: str | None
     agent_email: str | None
+    agent_telephone: str | None
+    agent_whatsapp: str | None
+    agent_adresse_domicile_exacte: str | None
     service_nom: str | None
     service_site: str | None
     direction_nom: str | None

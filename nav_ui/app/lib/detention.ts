@@ -21,6 +21,7 @@ export type Attribution = {
   materiel_provenance: string | null; materiel_provenance_detail: string | null; materiel_date_acquisition: string | null;
   agent_id: number; agent_matricule: string; agent_nom: string; agent_prenom: string;
   agent_fonction: string | null; agent_email: string | null;
+  agent_telephone: string | null; agent_whatsapp: string | null; agent_adresse_domicile_exacte: string | null;
   service_nom: string | null; service_site: string | null; direction_nom: string | null;
 };
 

@@ -29,6 +29,8 @@ def dossier(**over):
         "materiel_date_acquisition": date(2026, 6, 15),
         "agent_id": 3, "agent_matricule": "M-1042", "agent_nom": "RAKOTO", "agent_prenom": "Jean",
         "agent_fonction": "Analyste budgétaire", "agent_email": "jean.rakoto@example.mg",
+        "agent_telephone": "034 12 345 67", "agent_whatsapp": "032 12 345 67",
+        "agent_adresse_domicile_exacte": "Lot II B 25 Ankadifotsy, Antananarivo",
         "service_nom": "Dette publique", "service_site": "Antananarivo", "direction_nom": "Direction Générale du Trésor",
     }
     d.update(over)
@@ -125,3 +127,10 @@ def test_missing_information_leaves_rows_clean():
     assert fiche_pdf._info_detenteur(d) == [""]
     assert fiche_pdf._info_attribution(d) == ["", ""]
     assert fiche_pdf.build_pdf(d, "")[:4] == b"%PDF"
+
+
+def test_pdf_includes_contact_and_address():
+    from io import BytesIO
+    from pypdf import PdfReader
+    text = "".join(pg.extract_text() for pg in PdfReader(BytesIO(fiche_pdf.build_pdf(dossier(), ""))).pages)
+    assert "034 12 345 67" in text and "032 12 345 67" in text and "Ankadifotsy" in text

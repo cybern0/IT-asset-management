@@ -1,4 +1,4 @@
-from crud_api.schemas.common import ORMModel, BaseModel, OptS, S, partial
+from crud_api.schemas.common import ORMModel, BaseModel, OptS, OptText, S, partial
 from pydantic import EmailStr, BeforeValidator
 from typing import Annotated
 from crud_api.schemas.common import _blank_to_none
@@ -46,6 +46,9 @@ class AgentCreate(BaseModel):
     prenom: S(100)
     fonction: OptS(150) = None
     email: Annotated[EmailStr | None, BeforeValidator(_blank_to_none)] = None
+    telephone: OptS(30) = None
+    whatsapp: OptS(30) = None
+    adresse_domicile_exacte: OptText = None
     service_id: int | None = None
     actif: bool = True
 
@@ -60,5 +63,8 @@ class AgentOut(ORMModel):
     prenom: str
     fonction: str | None
     email: str | None
+    telephone: str | None
+    whatsapp: str | None
+    adresse_domicile_exacte: str | None
     service_id: int | None
     actif: bool

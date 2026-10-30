@@ -15,6 +15,10 @@ class FicheDetention(IdMixin, Base):
     affectation_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("affectation.id", ondelete="CASCADE"), unique=True
     )
+    # coordonnees propres au dossier (parc_9.sql) : si vides, la fiche reprend celles de l'agent
+    telephone: Mapped[str | None] = mapped_column(String(30))
+    whatsapp: Mapped[str | None] = mapped_column(String(30))
+    adresse_domicile_exacte: Mapped[str | None] = mapped_column(Text)
     # etape 1
     agent_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("agent.id"))
     categorie_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("categorie_materiel.id"))

@@ -212,6 +212,9 @@ function DetentionDetail({ d }: { d: Detention }) {
             {row("Direction", d.direction_nom)}
             {row("Site", d.service_site)}
             {row("Email", d.agent_email)}
+            {row("Téléphone", d.agent_telephone)}
+            {row("WhatsApp", d.agent_whatsapp)}
+            {row("Adresse exacte du domicile", d.agent_adresse_domicile_exacte)}
           </dl>
           <h3>{t("Signature et remise")}</h3>
           <dl>
