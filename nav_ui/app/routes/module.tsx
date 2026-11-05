@@ -3,7 +3,10 @@ import { AttributionsView } from "../components/AttributionsView";
 import { CrudPanel } from "../components/CrudPanel";
 import { DemandesView } from "../components/DemandesView";
 import { GlobalView } from "../components/GlobalView";
+import { AffectationTransfer } from "../components/AffectationTransfer";
 import { RepartitionView } from "../components/RepartitionView";
+import { TracabiliteView } from "../components/TracabiliteView";
+import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { useMenu } from "../lib/menu";
 import { rowsFor, sections } from "../lib/schema";
@@ -16,6 +19,7 @@ export default function Module() {
   const { rows } = useStore();
   const { t } = useI18n();
   const { ready, entitiesOf } = useMenu();
+  const { has } = useAuth();
 
   // les categories (qui decident des onglets affiches) viennent de la base : on attend leur chargement
   if (!ready) return <p className="api-loading" role="status">{t("Chargement…")}</p>;
@@ -62,6 +66,8 @@ export default function Module() {
           {entity?.custom === "attributions" && <AttributionsView />}
           {entity?.custom === "demandes" && <DemandesView />}
           {entity?.custom === "repartition" && <RepartitionView />}
+          {entity?.custom === "tracabilite" && <TracabiliteView />}
+          {entity?.key === "affectations" && has("affectation.transferer") && <AffectationTransfer />}
           {entity && !entity.custom && <CrudPanel key={entity.key} entity={entity} />}
         </>
       )}

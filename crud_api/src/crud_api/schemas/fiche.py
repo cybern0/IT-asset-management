@@ -112,7 +112,7 @@ class AttributionOut(ORMModel):
     materiel_date_acquisition: date | None
     materiel_a_image: bool
 
-    agent_id: int
+    agent_id: int | None  # None : agent supprime de la base (le nom reste affiche)
     agent_matricule: str
     agent_nom: str
     agent_prenom: str

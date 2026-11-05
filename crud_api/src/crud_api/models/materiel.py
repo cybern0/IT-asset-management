@@ -62,7 +62,10 @@ class Affectation(IdMixin, Base):
     __tablename__ = "affectation"
 
     materiel_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("materiel.id"))
-    agent_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("agent.id"))
+    # NULL si l'agent a ete supprime de la base (parc_12.sql) : son nom reste dans agent_nom
+    agent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("agent.id", ondelete="SET NULL"))
+    agent_matricule: Mapped[str | None] = mapped_column(String(50))
+    agent_nom: Mapped[str | None] = mapped_column(String(220))
     date_remise: Mapped[date] = mapped_column(Date, server_default=func.current_date())
     date_retour: Mapped[date | None] = mapped_column(Date)
     etat_remise: Mapped[str | None] = mapped_column(String(20))

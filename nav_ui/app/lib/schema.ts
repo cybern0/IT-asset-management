@@ -62,7 +62,7 @@ export type Entity = {
   /** Pas de bouton + (la creation passe par un autre circuit, ex. Attributions). */
   noCreate?: boolean;
   /** Onglet a ecran dedie (au lieu du CRUD generique). */
-  custom?: "attributions" | "demandes" | "repartition";
+  custom?: "attributions" | "demandes" | "repartition" | "tracabilite";
   /** Permission (code role_permission) exigee pour voir cet onglet ; sans elle, l'onglet est masque. */
   needs?: string;
   readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
@@ -243,6 +243,11 @@ const demandesTab: Entity = {
 const repartitionTab: Entity = {
   key: "repartition", label: "Répartition", singular: "une répartition", table: "affectation",
   custom: "repartition", titleFields: ["id"], fields: [],
+};
+
+const tracabiliteTab: Entity = {
+  key: "tracabilite", label: "Traçabilité des matériels", singular: "une traçabilité", table: "affectation",
+  custom: "tracabilite", titleFields: ["id"], fields: [],
 };
 
 const attribution: Entity[] = [
@@ -553,6 +558,11 @@ export const sections: Section[] = [
         slug: "repartition", label: "Répartition", icon: "layers", needs: "dashboard.repartition",
         description: "Matériel détenu par service, avec le nombre d’agents et de matériels par catégorie du dictionnaire.",
         entities: [repartitionTab],
+      },
+      {
+        slug: "tracabilite", label: "Traçabilité des matériels", icon: "clock", needs: "dashboard.repartition",
+        description: "Suivi du parcours de chaque matériel : détenteurs successifs, transferts et retours.",
+        entities: [tracabiliteTab],
       },
     ],
   },

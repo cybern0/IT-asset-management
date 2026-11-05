@@ -20,6 +20,16 @@ class DemandeCreate(BaseModel):
     demandeur: OptS(150) = None
 
 
+class TransfertCreate(BaseModel):
+    """Affectation directe par le depositaire comptable : le materiel est retire a son detenteur et donne a `agent_id`."""
+
+    materiel_id: int
+    agent_id: int
+    date: OptDate = None  # defaut : aujourd'hui
+    etat: Literal["NEUF", "BON", "A_REPARER"] | None = None  # etat constate a la remise (defaut : etat du materiel)
+    observations: OptText = None
+
+
 class ApprouverIn(BaseModel):
     materiel_id: int
     date: OptDate = None

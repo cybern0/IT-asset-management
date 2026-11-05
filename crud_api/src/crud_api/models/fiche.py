@@ -20,7 +20,9 @@ class FicheDetention(IdMixin, Base):
     whatsapp: Mapped[str | None] = mapped_column(String(30))
     adresse_domicile_exacte: Mapped[str | None] = mapped_column(Text)
     # etape 1
-    agent_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("agent.id"))
+    agent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("agent.id", ondelete="SET NULL"))  # NULL si l'agent a ete supprime (parc_12.sql)
+    agent_matricule: Mapped[str | None] = mapped_column(String(50))  # memoire du nom apres suppression de l'agent
+    agent_nom: Mapped[str | None] = mapped_column(String(220))
     categorie_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("categorie_materiel.id"))
     besoin: Mapped[str | None] = mapped_column(Text)
     canal: Mapped[str] = mapped_column(String(15), server_default=text("'FORMULAIRE'"))
@@ -46,7 +48,7 @@ class FicheDetention(IdMixin, Base):
     accessoires_autre: Mapped[str | None] = mapped_column(String(100))
     observations_remise: Mapped[str | None] = mapped_column(Text)
     # circuit de demande (parc_10.sql)
-    ancien_agent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("agent.id"))  # affectation : detenteur dont le materiel est retire
+    ancien_agent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("agent.id", ondelete="SET NULL"))  # affectation : detenteur dont le materiel est retire
     ancienne_affectation_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("affectation.id"))
     type_demande: Mapped[str] = mapped_column(String(12), server_default=text("'ATTRIBUTION'"))
     demande_par: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("utilisateur.id"))

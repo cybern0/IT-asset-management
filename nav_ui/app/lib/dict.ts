@@ -603,6 +603,19 @@ const A: [string, string, string][] = [
   ["Aucune modification à enregistrer.", "Nothing to save.", "Tsy misy fanovana hotehirizina."],
   ["Mot de passe actuel incorrect.", "Current password is incorrect.", "Diso ny teny miafina ankehitriny."],
   ["Le nouveau mot de passe doit être différent de l’actuel.", "The new password must differ from the current one.", "Tsy maintsy hafa amin'ny ankehitriny ny teny miafina vaovao."],
+  // --- export de la répartition, affectation directe, traçabilité (malgache : à traduire)
+  ["Traçabilité des matériels", "Equipment traceability", "Traçabilité des matériels"],
+  ["Suivi du parcours de chaque matériel : détenteurs successifs, transferts et retours.", "History of each item of equipment: successive holders, transfers and returns.", "Suivi du parcours de chaque matériel : détenteurs successifs, transferts et retours."],
+  ["Cette rubrique sera complétée prochainement.", "This section will be completed soon.", "Cette rubrique sera complétée prochainement."],
+  ["Nouvelle affectation", "New assignment", "Nouvelle affectation"],
+  ["Retirer un matériel à son détenteur actuel et l’affecter à un autre agent. Pour donner un matériel qui n’a pas de détenteur, utilisez Attributions.", "Take an item away from its current holder and assign it to another agent. To give an item that has no holder, use Attributions.", "Retirer un matériel à son détenteur actuel et l’affecter à un autre agent. Pour donner un matériel qui n’a pas de détenteur, utilisez Attributions."],
+  ["Choisissez le matériel et le nouvel agent.", "Choose the equipment and the new agent.", "Choisissez le matériel et le nouvel agent."],
+  ["Affectation enregistrée : {m} est maintenant détenu par le nouvel agent.", "Assignment saved: {m} is now held by the new agent.", "Affectation enregistrée : {m} est maintenant détenu par le nouvel agent."],
+  ["Matériel à retirer à son détenteur", "Equipment to take from its holder", "Matériel à retirer à son détenteur"],
+  ["Nouvel agent détenteur", "New holding agent", "Nouvel agent détenteur"],
+  ["Inchangé", "Unchanged", "Inchangé"],
+  ["Affecter", "Assign", "Affecter"],
+  ["Aucun matériel n’est détenu pour l’instant.", "No equipment is held at the moment.", "Aucun matériel n’est détenu pour l’instant."],
 ];
 
 // [anglais (clé), français, malgache] : noms de rubriques écrits en anglais dans le code

@@ -85,7 +85,9 @@ AffectationUpdate = partial(AffectationCreate, "AffectationUpdate")
 class AffectationOut(ORMModel):
     id: int
     materiel_id: int
-    agent_id: int
+    agent_id: int | None  # None : agent supprime de la base (voir agent_nom)
+    agent_matricule: str | None = None
+    agent_nom: str | None = None
     date_remise: date
     date_retour: date | None
     etat_remise: str | None

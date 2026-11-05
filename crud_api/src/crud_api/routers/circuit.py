@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.core.database import get_db
 from crud_api.core.deps import Principal, requires
-from crud_api.schemas.circuit import ApprouverIn, DemandeCreate, DemandeOut, NotificationOut
+from crud_api.schemas.circuit import ApprouverIn, DemandeCreate, DemandeOut, NotificationOut, TransfertCreate
+from crud_api.schemas.materiel import AffectationOut
 from crud_api.schemas.fiche import AvancerIn, MotifIn
 from crud_api.services import circuit_service as svc
 
@@ -15,6 +16,12 @@ _voir = requires("demande.voir_propres", "demande.voir_service", "demande.voir_t
 @router.get("/demandes/options")
 async def options(p: Principal = Depends(requires("demande.creer", "demande.approuver")), db: AsyncSession = Depends(get_db)):
     return await svc.options(db, p)
+
+
+@router.post("/transferts", response_model=AffectationOut, status_code=201, tags=["Affectations"])
+async def transfer(data: TransfertCreate, p: Principal = Depends(requires("affectation.transferer")), db: AsyncSession = Depends(get_db)):
+    """Affectation directe : retire un materiel a son detenteur et le donne a un autre agent (depositaire comptable)."""
+    return await svc.transfer(db, p, data)
 
 
 @router.get("/demandes", response_model=list[DemandeOut])

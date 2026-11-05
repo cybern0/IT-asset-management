@@ -72,7 +72,7 @@ def etat_of(f: FicheDetention, a: Affectation | None) -> str:
 def _select():
     return (
         select(FicheDetention, Agent, Materiel, Affectation, Service, Direction, Utilisateur, CategorieMateriel)
-        .join(Agent, Agent.id == FicheDetention.agent_id)
+        .outerjoin(Agent, Agent.id == FicheDetention.agent_id)  # l'agent peut avoir ete supprime
         .outerjoin(Materiel, Materiel.id == FicheDetention.materiel_id)
         .outerjoin(Affectation, Affectation.id == FicheDetention.affectation_id)
         .outerjoin(Service, Service.id == Agent.service_id)
@@ -115,10 +115,12 @@ def _flat(row) -> dict[str, Any]:
         "approuve_le": f.approuve_le, "motif_refus": f.motif_refus, "signature_agent_le": f.signature_agent_le,
         "signature_chef_le": f.signature_chef_le, "reception_approuvee_le": f.reception_approuvee_le,
         "agent_service_id": s.id if s else None, "chef_agent_id": s.chef_agent_id if s else None,
-        "agent_id": ag.id, "agent_matricule": ag.matricule, "agent_nom": ag.nom, "agent_prenom": ag.prenom,
-        "agent_fonction": ag.fonction, "agent_email": ag.email,
-        "agent_telephone": f.telephone or ag.telephone, "agent_whatsapp": f.whatsapp or ag.whatsapp,
-        "agent_adresse_domicile_exacte": f.adresse_domicile_exacte or ag.adresse_domicile_exacte,
+        # agent supprime de la base (ag is None) : on garde le nom memorise sur le dossier
+        "agent_id": ag.id if ag else None, "agent_matricule": ag.matricule if ag else (f.agent_matricule or "—"),
+        "agent_nom": ag.nom if ag else (f.agent_nom or "Agent supprimé"), "agent_prenom": ag.prenom if ag else "",
+        "agent_fonction": ag.fonction if ag else None, "agent_email": ag.email if ag else None,
+        "agent_telephone": f.telephone or (ag.telephone if ag else None), "agent_whatsapp": f.whatsapp or (ag.whatsapp if ag else None),
+        "agent_adresse_domicile_exacte": f.adresse_domicile_exacte or (ag.adresse_domicile_exacte if ag else None),
         "service_nom": s.nom if s else None, "service_site": s.site if s else None,
         "direction_nom": d.nom if d else None,
     }

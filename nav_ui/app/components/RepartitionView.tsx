@@ -1,6 +1,7 @@
 // Tableau de bord > Répartition : diagramme par services + nombre d'agents et de matériels par catégorie du dictionnaire
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
+import { saveBlob } from "../lib/detention";
 import { useI18n } from "../lib/i18n";
 
 type Cat = { nb_materiels: number; nb_agents: number };
@@ -17,11 +18,26 @@ export function RepartitionView() {
   const { t } = useI18n();
   const [rep, setRep] = useState<Rep | null>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState<"pdf" | "xlsx" | null>(null);
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     api.get<Rep>("/dashboard/repartition").then((r) => setRep(r as unknown as Rep))
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : t("Erreur inattendue.")));
   }, [t]);
+
+  /** Exporte la repartition (meme calcul que l'ecran) : le jeton passe par l'en-tete, puis on enregistre le fichier. */
+  async function exportAs(kind: "pdf" | "xlsx") {
+    setBusy(kind);
+    setExportError("");
+    try {
+      saveBlob(await api.blob(`/dashboard/repartition/export.${kind}`), `repartition-materiel-${new Date().toISOString().slice(0, 10)}.${kind}`);
+    } catch (e) {
+      setExportError(e instanceof ApiError ? e.message : t("L’export a échoué."));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   if (error) return <p className="error" role="alert">{error}</p>;
   if (!rep) return <p className="api-loading" role="status">{t("Chargement des données…")}</p>;
@@ -35,6 +51,15 @@ export function RepartitionView() {
     <div className="dash">
     <div className="dash-body">
       <p className="lede">{t("Matériel actuellement détenu par service : {m} matériels, {a} agents détenteurs.", { m: rep.total.nb_materiels, a: rep.total.nb_agents_detenteurs })}</p>
+      <div className="dash-tools">
+        <button type="button" className="btn ghost" onClick={() => void exportAs("xlsx")} disabled={busy !== null}>
+          {busy === "xlsx" ? t("Export en cours…") : t("Exporter en Excel")}
+        </button>
+        <button type="button" className="btn primary" onClick={() => void exportAs("pdf")} disabled={busy !== null}>
+          {busy === "pdf" ? t("Export en cours…") : t("Exporter en PDF")}
+        </button>
+      </div>
+      {exportError && <p className="error" role="alert">{exportError}</p>}
 
       <section className="dash-section">
         <h2>{t("Matériels par service")}</h2>
