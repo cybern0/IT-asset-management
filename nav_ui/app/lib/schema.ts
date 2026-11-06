@@ -234,11 +234,6 @@ export function categoryTabOf(code: string, categories: Row[]): { groupSlug: str
   return c && g ? { groupSlug: g.slug, key: categoryEntity(c, new Set(g.entities.map((e) => e.key))).key } : null;
 }
 
-/* Section « Demandes et attributions » : circuit de demande (agent -> dépositaire comptable -> signatures -> réception). */
-const demandesTab: Entity = {
-  key: "demandes", label: "Demandes de matériel", singular: "une demande", table: "affectation",
-  custom: "demandes", titleFields: ["id"], fields: [],
-};
 const repartitionTab: Entity = {
   key: "repartition", label: "Répartition", singular: "une répartition", table: "affectation",
   custom: "repartition", titleFields: ["id"], fields: [],
@@ -488,12 +483,12 @@ export const sections: Section[] = [
   },
   {
     slug: "circuit",
-    label: "Demandes et attributions",
+    label: "Circuit d’attribution",
     groups: [
       {
-        slug: "attribution", label: "Demandes et attributions", icon: "users",
+        slug: "attribution", label: "Attributions et affectations", icon: "users",
         description: "Demande de matériel, approbation, signatures (agent puis chef de service), remise et réception ; liste unique des attributions et des affectations, avec retour du matériel.",
-        entities: [demandesTab, ...attribution],
+        entities: attribution,
       },
       {
         slug: "repartition", label: "Répartition", icon: "layers", needs: "dashboard.repartition",

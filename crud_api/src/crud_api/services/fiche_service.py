@@ -54,7 +54,7 @@ def phase_of(f: FicheDetention) -> str:
     return "TERMINEE" if f.reception_approuvee_le else "A_APPROUVER_RECEPTION"
 
 
-# Un seul role : ADMIN fait toutes les etapes (parc_13.sql)
+# Un seul role : ADMIN fait toutes les etapes, au nom de l'agent et du chef de service (circuit_service, parc_14.sql)
 ROLE_ATTENDU = {
     "A_APPROUVER": "ADMIN", "A_SIGNER_AGENT": "ADMIN", "A_SIGNER_CHEF": "ADMIN",
     "A_REMETTRE": "ADMIN", "A_APPROUVER_RECEPTION": "ADMIN",

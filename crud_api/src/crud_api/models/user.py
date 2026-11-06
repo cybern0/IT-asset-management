@@ -43,6 +43,11 @@ class Utilisateur(IdMixin, Base):
     nom_utilisateur: Mapped[str] = mapped_column(String(80), unique=True)
     mot_de_passe_hash: Mapped[str] = mapped_column(Text)
     role_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("role.id"))
+    role: Mapped[Role] = relationship(lazy="joined")
     actif: Mapped[bool] = mapped_column(Boolean, server_default=true())
     derniere_connexion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cree_le: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def role_code(self) -> str:
+        return self.role.code

@@ -1,5 +1,6 @@
-# Comptes utilisateurs (un seul role : ADMIN)
+# Comptes utilisateurs : un seul role, ADMIN (depositaire comptable)
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +11,7 @@ class UserCreate(BaseModel):
     agent_id: int | None = None
     nom_utilisateur: S(80)
     mot_de_passe: str = Field(min_length=8, max_length=128)
-    role_id: int | None = None  # facultatif : le role ADMIN est le seul et il est applique par defaut
+    role_code: Literal["ADMIN"] = "ADMIN"  # facultatif : ADMIN est le seul role
     actif: bool = True
 
 
@@ -27,7 +28,7 @@ class UserOut(ORMModel):
     actif: bool
     derniere_connexion: datetime | None
     cree_le: datetime
-    role_code: str | None = None  # renseigne par /auth/login et /auth/me (toujours ADMIN)
+    role_code: str | None = None  # toujours ADMIN
     permissions: list[str] = Field(default_factory=list)  # codes de permission du role (RBAC), pour adapter l'interface
 
 

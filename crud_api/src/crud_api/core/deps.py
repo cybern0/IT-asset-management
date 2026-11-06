@@ -13,7 +13,7 @@ from crud_api.models import Permission, Role, Utilisateur, role_permission
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-# Un seul role existe dans la table `role` : ADMIN (parc_13.sql supprime GESTIONNAIRE et LECTURE).
+# Un seul role existe dans la table `role` : ADMIN (parc_13.sql et parc_14.sql retirent les autres).
 # Les DROITS ne sont pas codes ici : ils viennent des tables permission / role_permission (ADMIN les a tous).
 ADMIN = "ADMIN"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})

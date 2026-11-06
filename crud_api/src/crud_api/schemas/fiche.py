@@ -60,6 +60,9 @@ class AttributionOut(ORMModel):
     etape: int  # etape en cours (1 a 6 ; 6 = termine)
     etat: str  # EN_COURS | ATTRIBUEE | RENDUE | REFUSEE | ANNULEE
     cree_le: datetime
+    type_demande: str = "ATTRIBUTION"  # ATTRIBUTION | AFFECTATION (transfert d'un materiel deja detenu)
+    phase: str | None = None  # etape du circuit de demande (A_APPROUVER, A_SIGNER_AGENT, ... TERMINEE, CLOTUREE)
+    role_attendu: str | None = None  # ADMIN ou UTILISATEUR : qui doit agir ensuite (None si rien n'est attendu)
 
     # etape 1
     categorie_id: int | None

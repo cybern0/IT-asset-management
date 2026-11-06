@@ -682,6 +682,18 @@ const A: [string, string, string][] = [
   ["Tous les types", "All types", "Karazana rehetra"],
   ["Toutes les étapes", "All steps", "Dingana rehetra"],
   ["Type de demande", "Request type", "Karazan'ny fangatahana"],
+  // --- rôle utilisateur standard (mg à faire relire par un locuteur natif)
+  ["Administrateur (dépositaire comptable)", "Administrator (accounting custodian)", "Mpandrindra (mpitahiry kaontabilite)"],
+  ["En attente de l’agent ou du chef", "Waiting for the agent or head of department", "Miandry ny mpiasa na ny lehiben'ny sampana"],
+  ["Le chef de service", "The head of department", "Ny lehiben'ny sampana"],
+  ["L’agent demandeur", "The requesting agent", "Ny mpiasa nangataka"],
+  ["Obligatoire pour un utilisateur standard : il demande et signe pour cet agent.", "Required for a standard user: they request and sign for this agent.", "Tsy maintsy fenoina ho an'ny mpampiasa mahazatra: izy no mangataka sy manao sonia ho an'io mpiasa io."],
+  ["Qui doit agir", "Who must act", "Iza no tsy maintsy miasa"],
+  ["Un utilisateur standard doit être lié à un agent.", "A standard user must be linked to an agent.", "Tsy maintsy mifandray amin'ny mpiasa ny mpampiasa mahazatra."],
+  ["Utilisateur standard", "Standard user", "Mpampiasa mahazatra"],
+  ["À traiter", "To process", "Hovahana"],
+  ["À traiter par l’administrateur", "To be processed by the administrator", "Hovahan'ny mpandrindra"],
+  ["Circuit d’attribution", "Assignment workflow", "Fizotran'ny fanomezana"],
 ];
 
 // [anglais (clé), français, malgache] : noms de rubriques écrits en anglais dans le code

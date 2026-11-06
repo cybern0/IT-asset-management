@@ -17,14 +17,14 @@ async def test_full_circuit(client, monkeypatch):
     jacky = await make_agent(client, "C3")
     await client.patch(f"/services/{agent['service_id']}", json={"chef_agent_id": chef["id"]})  # chef du service de l'agent
     for name, ag in (("agent", agent), ("chef", chef), ("jacky", jacky)):
-        await post(client, "/utilisateurs", {"nom_utilisateur": name, "mot_de_passe": "secret-123", "agent_id": ag["id"]})
+        await post(client, "/utilisateurs", {"nom_utilisateur": name, "mot_de_passe": "secret-123", "role_code": "ADMIN", "agent_id": ag["id"]})
     m = await make_materiel(client, "ORD-C")
     settings = get_settings()
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "jwt_secret", "x" * 40)
 
     async def login(name):
-        r = await client.post("/auth/login", json={"nom_utilisateur": name, "mot_de_passe": "secret-123"})
+        r = await client.post("/auth/login", json={"nom_utilisateur": name, "mot_de_passe": "secret-123", "role_code": "ADMIN"})
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     ja = await login("jacky")
@@ -47,12 +47,24 @@ async def test_full_circuit(client, monkeypatch):
     assert (await client.get(f"/demandes/{d['id']}", headers=await login("agent"))).status_code == 200
 
 
+async def test_attributions_list_exposes_type_phase_and_who_is_expected(client):
+    """La liste « Attributions et affectations » s'appuie sur ces champs : type, phase, role attendu."""
+    holder = await make_agent(client, "L1")
+    d1 = await post(client, "/demandes", {"type_demande": "ATTRIBUTION", "agent_id": holder["id"]})
+    d2 = await post(client, "/demandes", {"type_demande": "AFFECTATION", "agent_id": holder["id"]})
+    rows = {r["id"]: r for r in (await client.get("/attributions")).json()}
+    assert rows[d1["id"]]["type_demande"] == "ATTRIBUTION" and rows[d2["id"]]["type_demande"] == "AFFECTATION"
+    assert rows[d1["id"]]["phase"] == "A_APPROUVER" and rows[d1["id"]]["role_attendu"] == "ADMIN"
+    one = (await client.get(f"/attributions/{d2['id']}")).json()
+    assert one["type_demande"] == "AFFECTATION"
+
+
 async def test_affectation_transfers_item_from_holder(client, monkeypatch):
     """Affectation : le materiel est retire a son detenteur et affecte a un autre (ancienne affectation close)."""
     holder, newcomer, chef, jacky = [await make_agent(client, k) for k in ("T1", "T2", "T3", "T4")]
     await client.patch(f"/services/{newcomer['service_id']}", json={"chef_agent_id": chef["id"]})
     for name, ag in (("new", newcomer), ("chef", chef), ("jacky", jacky)):
-        await post(client, "/utilisateurs", {"nom_utilisateur": name, "mot_de_passe": "secret-123", "agent_id": ag["id"]})
+        await post(client, "/utilisateurs", {"nom_utilisateur": name, "mot_de_passe": "secret-123", "role_code": "ADMIN", "agent_id": ag["id"]})
     m = await make_materiel(client, "ORD-T")
     aff = await post(client, "/affectations", {"materiel_id": m["id"], "agent_id": holder["id"]})
     settings = get_settings()
@@ -60,7 +72,7 @@ async def test_affectation_transfers_item_from_holder(client, monkeypatch):
     monkeypatch.setattr(settings, "jwt_secret", "x" * 40)
 
     async def login(name):
-        r = await client.post("/auth/login", json={"nom_utilisateur": name, "mot_de_passe": "secret-123"})
+        r = await client.post("/auth/login", json={"nom_utilisateur": name, "mot_de_passe": "secret-123", "role_code": "ADMIN"})
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     ja = await login("jacky")  # tous les comptes sont ADMIN : un seul suffit pour faire chaque etape

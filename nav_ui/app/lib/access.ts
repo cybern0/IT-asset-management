@@ -2,7 +2,7 @@
 // role_permission de parc_10.sql). L'interface se contente de les lire : changer les droits d'un role = modifier
 // la base, pas ce fichier. Cote serveur, les memes permissions sont verifiees route par route.
 
-/** Un seul role existe : ADMIN (parc_13.sql). */
+/** Un seul role existe : ADMIN (parc_13.sql, parc_14.sql). */
 export type RoleCode = "ADMIN";
 /** Raccourcis historiques des composants (CrudPanel...) : lecture / ecriture / suppression du parc. */
 export type Permission = "read" | "write" | "delete";

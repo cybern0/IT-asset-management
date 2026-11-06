@@ -35,7 +35,11 @@ const STEPS: { n: number; title: string; desc: string }[] = [
   { n: 5, title: "Remise du matériel", desc: "Le matériel est remis à l’agent et la détention est enregistrée." },
   { n: 6, title: "Approbation de la réception", desc: "Le chef de service approuve la réception du matériel." },
 ];
-const WAIT: Record<string, string> = { ADMIN: "Dépositaire comptable" };
+/** Qui est attendu à l'étape en cours (ADMIN peut toutefois agir à la place de l'agent ou du chef). */
+const WAIT: Record<string, string> = {
+  A_APPROUVER: "Dépositaire comptable", A_REMETTRE: "Dépositaire comptable",
+  A_SIGNER_AGENT: "L’agent demandeur", A_SIGNER_CHEF: "Le chef de service", A_APPROUVER_RECEPTION: "Le chef de service",
+};
 const ACTION: Record<string, string> = {
   approuver: "Approuver", "signer-agent": "Signer", "signer-chef": "Signer (chef de service)",
   remettre: "Enregistrer la remise", "approuver-reception": "Approuver la réception",
@@ -186,7 +190,7 @@ export function DemandesView() {
               <div className="pane-head">
                 <h2>{current.reference}</h2>
                 <span className="head-actions">
-                  {current.materiel_id !== null && (
+                  {current.materiel_id !== null && has("parc.lire") && (
                     <button type="button" className="btn ghost" onClick={() => void downloadPdf(current).catch((e) => setError(e instanceof ApiError ? e.message : t("Erreur inattendue.")))}>
                       {t("Exporter en PDF")}
                     </button>
@@ -253,7 +257,7 @@ function DemandeSteps({ d, opts, onChange }: { d: Demande; opts: Options; onChan
     const action = STEP_ACTION[n];
     if (closed || step !== n) return null;
     if (!d.actions.includes(action)) {
-      return d.role_attendu ? <p className="hint">{t("En attente de")} : {t(WAIT[d.role_attendu] ?? d.role_attendu)}</p> : null;
+      return WAIT[d.phase] ? <p className="hint">{t("En attente de")} : {t(WAIT[d.phase])}</p> : null;
     }
     if (action === "approuver") {
       return (
