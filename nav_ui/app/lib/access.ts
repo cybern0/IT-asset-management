@@ -2,15 +2,14 @@
 // role_permission de parc_10.sql). L'interface se contente de les lire : changer les droits d'un role = modifier
 // la base, pas ce fichier. Cote serveur, les memes permissions sont verifiees route par route.
 
-export type RoleCode = "ADMIN" | "GESTIONNAIRE" | "LECTURE";
+/** Un seul role existe : ADMIN (parc_13.sql). */
+export type RoleCode = "ADMIN";
 /** Raccourcis historiques des composants (CrudPanel...) : lecture / ecriture / suppression du parc. */
 export type Permission = "read" | "write" | "delete";
 export type Area = "dashboard" | "circuit" | "assets" | "administration";
 
 export const ROLE_LABEL: Record<RoleCode, string> = {
   ADMIN: "Dépositaire comptable (administrateur)",
-  GESTIONNAIRE: "Gestionnaire d’activité",
-  LECTURE: "Agent (utilisateur standard)",
 };
 
 export const LEGACY_PERMISSION: Record<Permission, string> = {
@@ -25,9 +24,9 @@ export const AREA_PERMISSIONS: Record<Area, string[]> = {
   administration: ["acces.gerer"],
 };
 
-const ADMIN_ONLY_TABLES = new Set(["utilisateur", "role", "permission"]);
+const ADMIN_ONLY_TABLES = new Set(["utilisateur"]);
 
-export const isRoleCode = (v: unknown): v is RoleCode => v === "ADMIN" || v === "GESTIONNAIRE" || v === "LECTURE";
+export const isRoleCode = (v: unknown): v is RoleCode => v === "ADMIN";
 
 export const canReadTable = (permissions: readonly string[], table: string): boolean =>
   table === "journal_audit" ? permissions.includes("audit.lire")

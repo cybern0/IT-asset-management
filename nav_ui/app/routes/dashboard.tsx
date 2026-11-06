@@ -34,7 +34,7 @@ function useFormat() {
 
 type Fmt = ReturnType<typeof useFormat>;
 
-/** Le depositaire comptable voit la vue d'ensemble ; les autres roles arrivent directement sur la repartition. */
+/** L'administrateur voit la vue d'ensemble ; un compte sans le droit dashboard.voir arrive directement sur la repartition. */
 export default function Dashboard() {
   const { has } = useAuth();
   return has("dashboard.voir") ? <Overview /> : <Navigate to="/circuit/repartition/repartition" replace />;

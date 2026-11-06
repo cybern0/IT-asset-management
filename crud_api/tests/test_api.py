@@ -55,35 +55,36 @@ async def test_validation_errors_use_pydantic_format(client):
     assert r.status_code == 422
 
 
-async def test_roles_with_permissions(client):
-    p1 = await post(client, "/permissions", {"code": "a:lire", "libelle": "Lire"})
-    p2 = await post(client, "/permissions", {"code": "a:ecrire", "libelle": "Écrire"})
-    role = await post(client, "/roles", {"code": "TEST", "libelle": "Test", "permission_ids": [p2["id"], p1["id"]]})
-    assert role["permission_ids"] == sorted([p1["id"], p2["id"]])
-    r = await client.patch(f"/roles/{role['id']}", json={"permission_ids": [p1["id"]]})
-    assert r.json()["permission_ids"] == [p1["id"]]
-    r = await client.post("/roles", json={"code": "BAD", "libelle": "Bad", "permission_ids": [999]})
-    assert r.status_code == 422 and r.json()["field"] == "permission_ids"
-    # supprimer une permission la retire des roles (ON DELETE CASCADE)
-    assert (await client.delete(f"/permissions/{p1['id']}")).status_code == 204
-    assert (await client.get(f"/roles/{role['id']}")).json()["permission_ids"] == []
-    # les roles initiaux de parc.sql sont presents
-    codes = {x["code"] for x in (await client.get("/roles")).json()}
-    assert {"ADMIN", "GESTIONNAIRE", "LECTURE"} <= codes
+async def test_single_admin_role(client):
+    """Un seul role existe : ADMIN. Plus de routes /roles ni /permissions ; tout compte cree est administrateur."""
+    assert (await client.get("/roles")).status_code == 404
+    assert (await client.get("/permissions")).status_code == 404
+    u = await post(client, "/utilisateurs", {"nom_utilisateur": "a1", "mot_de_passe": "secret-123"})  # role_id facultatif
+    r = await client.post("/auth/login", json={"nom_utilisateur": "a1", "mot_de_passe": "secret-123"})
+    assert r.status_code == 200 and r.json()["user"]["role_code"] == "ADMIN"
+    assert r.json()["user"]["role_id"] == u["role_id"]
+    # un autre role est refuse, a la creation comme a la modification
+    r = await client.post("/utilisateurs", json={"nom_utilisateur": "a2", "mot_de_passe": "secret-123", "role_id": 999999})
+    assert r.status_code == 422 and r.json()["field"] == "role_id"
+    r = await client.patch(f"/utilisateurs/{u['id']}", json={"role_id": 999999})
+    assert r.status_code == 422 and r.json()["field"] == "role_id"
+    # ADMIN porte TOUS les droits, y compris ceux des anciens roles (signatures, reception, transfert)
+    me = (await client.post("/auth/login", json={"nom_utilisateur": "a1", "mot_de_passe": "secret-123"})).json()["user"]
+    assert {"fiche.signer_agent", "fiche.signer_chef", "reception.approuver", "demande.creer", "demande.voir_propres",
+            "demande.voir_service", "demande.voir_toutes", "affectation.transferer", "acces.gerer"} <= set(me["permissions"])
 
 
 async def test_users_password_and_last_admin(client):
-    roles = {x["code"]: x["id"] for x in (await client.get("/roles")).json()}
-    u = await post(client, "/utilisateurs", {"nom_utilisateur": "admin", "mot_de_passe": "secret-123", "role_id": roles["ADMIN"]})
+    u = await post(client, "/utilisateurs", {"nom_utilisateur": "admin", "mot_de_passe": "secret-123"})
     assert "mot_de_passe" not in u and "mot_de_passe_hash" not in u
-    r = await client.post("/utilisateurs", json={"nom_utilisateur": "admin", "mot_de_passe": "secret-123", "role_id": roles["ADMIN"]})
+    r = await client.post("/utilisateurs", json={"nom_utilisateur": "admin", "mot_de_passe": "secret-123"})
     assert r.status_code == 409 and r.json()["field"] == "nom_utilisateur"
-    r = await client.post("/utilisateurs", json={"nom_utilisateur": "x", "mot_de_passe": "court", "role_id": roles["ADMIN"]})
+    r = await client.post("/utilisateurs", json={"nom_utilisateur": "x", "mot_de_passe": "court"})
     assert r.status_code == 422
     # dernier administrateur actif protege
     assert (await client.patch(f"/utilisateurs/{u['id']}", json={"actif": False})).status_code == 409
     assert (await client.delete(f"/utilisateurs/{u['id']}")).status_code == 409
-    other = await post(client, "/utilisateurs", {"nom_utilisateur": "lect", "mot_de_passe": "secret-123", "role_id": roles["LECTURE"]})
+    other = await post(client, "/utilisateurs", {"nom_utilisateur": "autre", "mot_de_passe": "secret-123"})
     assert (await client.delete(f"/utilisateurs/{other['id']}")).status_code == 204
     # login
     r = await client.post("/auth/login", json={"nom_utilisateur": "admin", "mot_de_passe": "secret-123"})
@@ -148,8 +149,7 @@ async def test_affectation_lifecycle(client):
 
 
 async def test_stock_movements(client):
-    roles = {x["code"]: x["id"] for x in (await client.get("/roles")).json()}
-    user = await post(client, "/utilisateurs", {"nom_utilisateur": "gest", "mot_de_passe": "secret-123", "role_id": roles["GESTIONNAIRE"]})
+    user = await post(client, "/utilisateurs", {"nom_utilisateur": "gest", "mot_de_passe": "secret-123"})
     d = await post(client, "/directions", {"code": "D", "nom": "D"})
     s1 = await post(client, "/services", {"direction_id": d["id"], "code": "S1", "nom": "S1"})
     art = await post(client, "/articles-consommables", {"reference": "PAP", "designation": "Papier", "seuil_alerte": "5"})
@@ -217,14 +217,12 @@ async def test_audit_log_is_written_and_read_only(client):
     assert (await client.post("/journal-audit", json={"action": "X"})).status_code == 405
     assert (await client.delete(f"/journal-audit/{entries[0]['id']}")).status_code in (404, 405)
     # un secret n'est jamais journalise
-    roles = {x["code"]: x["id"] for x in (await client.get("/roles")).json()}
-    await post(client, "/utilisateurs", {"nom_utilisateur": "u", "mot_de_passe": "secret-123", "role_id": roles["LECTURE"]})
+    await post(client, "/utilisateurs", {"nom_utilisateur": "u", "mot_de_passe": "secret-123"})
     assert "secret-123" not in (await client.get("/journal-audit")).text
 
 
 async def test_authentication_when_enabled(client, monkeypatch):
-    roles = {x["code"]: x["id"] for x in (await client.get("/roles")).json()}
-    await post(client, "/utilisateurs", {"nom_utilisateur": "admin", "mot_de_passe": "secret-123", "role_id": roles["ADMIN"]})
+    await post(client, "/utilisateurs", {"nom_utilisateur": "admin", "mot_de_passe": "secret-123"})
     settings = get_settings()
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "jwt_secret", "x" * 40)
@@ -243,45 +241,25 @@ async def test_authentication_when_enabled(client, monkeypatch):
     assert any(e["action"] == "CREATE" and e["utilisateur_id"] is not None for e in entries)
 
 
-async def test_authorization_by_role(client, monkeypatch):
-    """ADMIN : tout. GESTIONNAIRE : lit et modifie le parc, ne supprime pas, pas d'administration. LECTURE : lecture seule."""
-    roles = {x["code"]: x["id"] for x in (await client.get("/roles")).json()}
-    for name, code in (("adm", "ADMIN"), ("ges", "GESTIONNAIRE"), ("lec", "LECTURE")):
-        await post(client, "/utilisateurs", {"nom_utilisateur": name, "mot_de_passe": "secret-123", "role_id": roles[code]})
+async def test_authorization_admin_only(client, monkeypatch):
+    """Un seul role : sans connexion tout est refuse (401) ; un ADMIN connecte a acces a tout."""
+    await post(client, "/utilisateurs", {"nom_utilisateur": "adm", "mot_de_passe": "secret-123"})
     m = await make_materiel(client, "ORD-A")
     settings = get_settings()
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "jwt_secret", "x" * 40)
 
-    async def login(name, code):
-        r = await client.post("/auth/login", json={"nom_utilisateur": name, "mot_de_passe": "secret-123"})
-        assert r.status_code == 200 and r.json()["user"]["role_code"] == code
-        auth = {"Authorization": f"Bearer {r.json()['access_token']}"}
-        assert (await client.get("/auth/me", headers=auth)).json()["role_code"] == code
-        return auth
+    for url in ("/materiels", "/agents", "/utilisateurs", "/journal-audit", "/dashboard", "/dashboard/repartition"):
+        assert (await client.get(url)).status_code == 401, url
 
-    # Agent standard : ne voit que la repartition ; aucun acces au parc, aux comptes ni a l'audit
-    lec = await login("lec", "LECTURE")
-    assert (await client.get("/dashboard/repartition", headers=lec)).status_code == 200
-    assert (await client.get("/dashboard", headers=lec)).status_code == 403
-    assert (await client.get("/materiels", headers=lec)).status_code == 403
-    assert (await client.get("/agents", headers=lec)).status_code == 403
-    assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "X"}, headers=lec)).status_code == 403
-    assert (await client.get("/utilisateurs", headers=lec)).status_code == 403
-
-    # Gestionnaire d'activite : approuve la reception ; ne touche ni au parc ni aux comptes
-    ges = await login("ges", "GESTIONNAIRE")
-    assert (await client.get("/dashboard/repartition", headers=ges)).status_code == 200
-    assert (await client.get("/materiels", headers=ges)).status_code == 403
-    assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "PC 2"}, headers=ges)).status_code == 403
-    assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=ges)).status_code == 403
-    assert (await client.get("/utilisateurs", headers=ges)).status_code == 403
-    assert (await client.get("/journal-audit", headers=ges)).status_code == 403
-
-    adm = await login("adm", "ADMIN")
-    assert (await client.get("/utilisateurs", headers=adm)).status_code == 200
-    assert (await client.get("/journal-audit", headers=adm)).status_code == 200
+    r = await client.post("/auth/login", json={"nom_utilisateur": "adm", "mot_de_passe": "secret-123"})
+    assert r.status_code == 200 and r.json()["user"]["role_code"] == "ADMIN"
+    adm = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert (await client.get("/auth/me", headers=adm)).json()["role_code"] == "ADMIN"
+    for url in ("/materiels", "/agents", "/utilisateurs", "/journal-audit", "/dashboard", "/dashboard/repartition"):
+        assert (await client.get(url, headers=adm)).status_code == 200, url
     assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=adm)).status_code == 201
+    assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "PC 2"}, headers=adm)).status_code == 200
     assert (await client.delete(f"/materiels/{m['id']}", headers=adm)).status_code == 204
 
 

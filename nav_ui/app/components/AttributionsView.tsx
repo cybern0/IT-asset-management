@@ -8,24 +8,27 @@ import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { tone } from "../lib/schema";
 import { useStore } from "../lib/store";
+import { AffectationTransfer } from "./AffectationTransfer";
 import { AttributionSteps } from "./AttributionSteps";
 
 const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** Circuit d'attribution en 6 etapes : demande -> selection -> fiche -> signature -> remise -> statut. */
+/** Liste unique « Attributions et affectations » : chaque dossier est une attribution (materiel sans detenteur) ou une
+ *  affectation (transfert d'un materiel deja detenu) ; son detail montre le circuit en 6 etapes puis le retour du materiel. */
 /** Fiche generee (equipement choisi), pas encore signee, dossier non clos. */
 const needsSignature = (d: Attribution) => d.cloture === null && d.materiel_id !== null && d.statut !== "SIGNEE";
 
 export function AttributionsView() {
   const { t } = useI18n();
-  const { can } = useAuth();
+  const { can, has } = useAuth();
   const [items, setItems] = useState<Attribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [etat, setEtat] = useState("");
   const [sig, setSig] = useState("");
+  const [type, setType] = useState("");
   const [selected, setSelected] = useState<number | "new" | null>(null);
 
   const load = useCallback(async () => {
@@ -42,21 +45,24 @@ export function AttributionsView() {
     const q = norm(query.trim());
     return items.filter((d) => {
       if (etat && d.etat !== etat) return false;
+      if (type && (d.type_demande ?? "ATTRIBUTION") !== type) return false;
       if (sig === "A_SIGNER" && !(needsSignature(d))) return false;
       if (sig === "SIGNEE" && d.statut !== "SIGNEE") return false;
       if (!q) return true;
       return norm(`${d.reference} ${agentName(d)} ${d.agent_matricule} ${d.materiel_designation ?? ""} ${d.materiel_code ?? ""}`).includes(q);
     });
-  }, [items, query, etat, sig]);
+  }, [items, query, etat, sig, type]);
 
   const current = typeof selected === "number" ? items.find((d) => d.id === selected) ?? null : null;
   const replace = (f: Attribution) => setItems((list) => list.map((d) => (d.id === f.id ? f : d)));
 
   return (
+    <>
+    {has("affectation.transferer") && <AffectationTransfer onDone={() => void load()} />}
     <div className="crud">
-      <section className="pane" aria-label={t("Liste : {x}", { x: t("Attributions") })}>
+      <section className="pane" aria-label={t("Liste : {x}", { x: t("Attributions et affectations") })}>
         <div className="pane-head">
-          <h2>{t("Attributions")} <span className="count">{visible.length}</span></h2>
+          <h2>{t("Attributions et affectations")} <span className="count">{visible.length}</span></h2>
           {can("write") && (
             <button type="button" className="add-btn" onClick={() => setSelected("new")}
               aria-label={t("Nouvelle demande d’équipement")} title={t("Nouvelle demande d’équipement")}>
@@ -74,6 +80,11 @@ export function AttributionsView() {
             <option value="">{t("Tous les dossiers")}</option>
             {Object.entries(ETAT_LABEL).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
           </select>
+          <select value={type} onChange={(e) => setType(e.target.value)} aria-label={t("Type de demande")}>
+            <option value="">{t("Tous les types")}</option>
+            <option value="ATTRIBUTION">{t("Attribution")}</option>
+            <option value="AFFECTATION">{t("Affectation (transfert)")}</option>
+          </select>
           <select value={sig} onChange={(e) => setSig(e.target.value)} aria-label={t("État de la fiche")}>
             <option value="">{t("Toutes les fiches")}</option>
             <option value="A_SIGNER">{t("À signer")}</option>
@@ -87,7 +98,7 @@ export function AttributionsView() {
             : visible.length === 0 ? (
               <p className="empty">
                 {items.length > 0 ? t("Aucun résultat pour ce filtre.")
-                  : t("Aucune attribution pour l’instant. Utilisez le bouton + pour enregistrer une demande.")}
+                  : t("Aucune attribution ni affectation pour l’instant. Utilisez le bouton + pour enregistrer une demande.")}
               </p>
             ) : (
               <ul className="items">
@@ -103,6 +114,7 @@ export function AttributionsView() {
                           </span>
                         </span>
                         <span className="badges">
+                          {d.type_demande === "AFFECTATION" && <span className="badge" data-tone="neutral">{t("Transfert")}</span>}
                           {needsSignature(d) && <span className="badge" data-tone="warn">{t("À signer")}</span>}
                           <span className="badge" data-tone={d.etat === "EN_COURS" ? "warn" : tone(ETAT_LABEL[d.etat])}>{label}</span>
                         </span>
@@ -145,6 +157,7 @@ export function AttributionsView() {
         )}
       </section>
     </div>
+    </>
   );
 }
 

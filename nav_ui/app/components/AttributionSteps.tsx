@@ -13,6 +13,8 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").to
 
 type StepState = "done" | "current" | "todo";
 
+const ETAT_RETOUR: Record<string, string> = { NEUF: "Neuf", BON: "Bon", A_REPARER: "À réparer", EN_PANNE: "En panne", REFORME: "Réformé" };
+
 // Libelle du bouton qui defait la derniere etape faite, selon l'etape en cours
 const UNDO_LABEL: Record<number, string> = { 2: "Annuler la validation", 4: "Changer d’équipement" };
 
@@ -135,10 +137,21 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                 )}
 
                 {s.n === 6 && attributed && (
-                  <p className="step-sum">
-                    {t("Matériel au statut « Attribué » (affectation n° {n}). La fiche signée est archivée.", { n: d.affectation_id ?? "" })}
-                    {d.date_retour && ` ${t("Rendu le {d}.", { d: fmtDate(d.date_retour) })}`}
-                  </p>
+                  <>
+                    <p className="step-sum">
+                      {t("Matériel au statut « Attribué » (affectation n° {n}). La fiche signée est archivée.", { n: d.affectation_id ?? "" })}
+                      {d.date_retour && ` ${t("Rendu le {d}.", { d: fmtDate(d.date_retour) })}`}
+                      {d.date_retour && d.etat_retour ? ` ${t("État au retour")} : ${t(ETAT_RETOUR[d.etat_retour] ?? d.etat_retour)}.` : ""}
+                    </p>
+                    {!d.date_retour && writable && (
+                      <ReturnForm d={d} busy={busy} onReturn={(v) => run(async () => {
+                        await api.update("affectations", String(d.affectation_id), {
+                          date_retour: v.date, etat_retour: v.etat || null, ...(v.observations ? { observations: v.observations } : {}),
+                        });
+                        return api.get<Attribution>(`/attributions/${d.id}`);
+                      }, () => refresh(["materiel", "affectation", "journal_audit"]))} />
+                    )}
+                  </>
                 )}
               </div>
             </li>
@@ -169,6 +182,38 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
         </div>
       )}
       {error && <p className="error" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+/** Retour du materiel : ferme l'affectation (le materiel redevient disponible, le dossier passe a « Rendu »). */
+function ReturnForm({ d, busy, onReturn }: { d: Attribution; busy: boolean; onReturn: (v: { date: string; etat: string; observations: string }) => void }) {
+  const { t } = useI18n();
+  const [date, setDate] = useState(today());
+  const [etat, setEtat] = useState("");
+  const [observations, setObservations] = useState("");
+  return (
+    <div className="step-form">
+      <p className="hint">{t("Quand l’agent rend le matériel, enregistrez son retour.")}</p>
+      <div className="row">
+        <label>{t("Date de retour")}
+          <input type="date" value={date} min={d.date_remise ?? undefined} max={today()} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <label>{t("État au retour")}
+          <select value={etat} onChange={(e) => setEtat(e.target.value)}>
+            <option value="">—</option>
+            {Object.entries(ETAT_RETOUR).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
+          </select>
+        </label>
+      </div>
+      <label>{t("Observations")}
+        <textarea rows={2} value={observations} onChange={(e) => setObservations(e.target.value)} />
+      </label>
+      <div className="row">
+        <button type="button" className="btn primary" disabled={busy || !date} onClick={() => onReturn({ date, etat, observations: observations.trim() })}>
+          {t("Enregistrer le retour")}
+        </button>
+      </div>
     </div>
   );
 }

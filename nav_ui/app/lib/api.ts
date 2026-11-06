@@ -20,7 +20,7 @@ export type AuthUser = {
   id: number;
   nom_utilisateur: string;
   role_id: number;
-  role_code: string | null; // ADMIN, GESTIONNAIRE, LECTURE...
+  role_code: string | null; // toujours ADMIN
   agent_id?: number | null;
   permissions?: string[]; // codes de permission du role (RBAC)
   derniere_connexion?: string | null;

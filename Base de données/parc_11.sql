@@ -70,7 +70,9 @@ WHERE m.statut = 'ATTRIBUE'
                   WHERE f.materiel_id = m.id AND f.affectation_id IS NULL AND f.cloture IS NULL);
 
 -- Historique des transferts : de qui, vers qui
-CREATE OR REPLACE VIEW v_transferts AS
+-- (DROP puis CREATE : parc_12.sql ajoute une colonne a cette vue, et CREATE OR REPLACE ne sait pas en retirer une au rejeu)
+DROP VIEW IF EXISTS v_transferts;
+CREATE VIEW v_transferts AS
 SELECT f.id AS fiche_id, f.reference, f.materiel_id, m.code_inventaire,
        f.ancien_agent_id, f.agent_id AS nouvel_agent_id, f.date_remise, f.reception_approuvee_le
 FROM fiche_detention f

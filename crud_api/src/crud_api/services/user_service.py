@@ -42,15 +42,29 @@ class UserService(CRUDService[Utilisateur]):
         if not others:
             raise ConflictError("Impossible : il doit rester au moins un administrateur actif.")
 
+    async def _admin_role_id(self, db: AsyncSession) -> int:
+        """Id du seul role existant : ADMIN."""
+        role_id = await db.scalar(select(Role.id).where(Role.code == "ADMIN"))
+        if role_id is None:
+            raise UnprocessableError("Le rôle ADMIN est introuvable (exécutez parc_13.sql).", field="role_id")
+        return role_id
+
     async def prepare_create(self, db: AsyncSession, values: dict[str, Any]) -> dict[str, Any]:
         values["mot_de_passe_hash"] = hash_password(values.pop("mot_de_passe"))
+        admin_id = await self._admin_role_id(db)
+        if values.get("role_id") not in (None, admin_id):
+            raise UnprocessableError("Le seul rôle disponible est ADMIN.", field="role_id")
+        values["role_id"] = admin_id  # tout compte est administrateur
         return values
 
     async def prepare_update(self, db: AsyncSession, obj: Utilisateur, values: dict[str, Any]) -> dict[str, Any]:
         password = values.pop("mot_de_passe", None)
         if password:
             values["mot_de_passe_hash"] = hash_password(password)
-        if values.get("actif") is False or ("role_id" in values and values["role_id"] != obj.role_id):
+        if "role_id" in values and values["role_id"] not in (None, obj.role_id):
+            raise UnprocessableError("Le seul rôle disponible est ADMIN.", field="role_id")
+        values.pop("role_id", None)  # le role ne change jamais
+        if values.get("actif") is False:
             await self._ensure_other_admin(db, obj)
         return values
 

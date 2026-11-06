@@ -1,5 +1,5 @@
 // Affectation directe : le depositaire comptable RETIRE un materiel a son detenteur et l'AFFECTE a un autre agent.
-// (Une ATTRIBUTION, elle, donne a un agent un materiel qui n'a pas de detenteur : voir l'onglet Attributions.)
+// (Une ATTRIBUTION, elle, donne a un agent un materiel qui n'a pas de detenteur : bouton + de la liste Attributions et affectations.)
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { useI18n } from "../lib/i18n";
@@ -13,7 +13,7 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").to
 const today = () => new Date().toISOString().slice(0, 10);
 const EMPTY = { materiel: "", agent: "", date: today(), etat: "", observations: "" };
 
-export function AffectationTransfer() {
+export function AffectationTransfer({ onDone }: { onDone?: () => void }) {
   const { t } = useI18n();
   const { rows, refresh } = useStore();
   const [open, setOpen] = useState(false);
@@ -54,6 +54,7 @@ export function AffectationTransfer() {
         etat: form.etat || null, observations: form.observations || null,
       });
       await refresh(["affectation", "materiel"]);
+      onDone?.();  // la liste des dossiers recharge : le transfert a cree un dossier de regularisation
       setDone(t("Affectation enregistrée : {m} est maintenant détenu par le nouvel agent.", { m: chosen?.code_inventaire ?? "" }));
       close();
     } catch (err) {
@@ -66,7 +67,7 @@ export function AffectationTransfer() {
   return (
     <section className="dash-section">
       <button type="button" className="btn primary" onClick={() => { setDone(""); setOpen(true); }}>{t("Nouvelle affectation")}</button>
-      <p className="hint">{t("Retirer un matériel à son détenteur actuel et l’affecter à un autre agent. Pour donner un matériel qui n’a pas de détenteur, utilisez Attributions.")}</p>
+      <p className="hint">{t("Retirer un matériel à son détenteur actuel et l’affecter à un autre agent. Pour donner un matériel qui n’a pas de détenteur, utilisez le bouton + de la liste.")}</p>
       {done && <p className="lede" role="status">{done}</p>}
       {open && (
         <Modal title={t("Nouvelle affectation")} onClose={close}>

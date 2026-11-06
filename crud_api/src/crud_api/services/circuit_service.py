@@ -1,6 +1,8 @@
 # Circuit de demande (RBAC) :
-#   1 l'agent demande (attribution ou affectation)   2 le depositaire comptable approuve, choisit le materiel, met la base a jour
-#   3 l'agent signe, puis le chef de son service     4 remise du materiel   5 le chef de service approuve la reception
+#   1 demande (attribution ou affectation)           2 le depositaire comptable approuve, choisit le materiel, met la base a jour
+#   3 signature de l'agent, puis du chef de son service     4 remise du materiel   5 approbation de la reception par le chef de service
+# Un seul role existe (ADMIN, tous les droits) : un administrateur fait chaque etape au nom de l'agent ou du chef de
+# service (le compte qui agit est enregistre sur la fiche).
 # Chaque etape prepare les notifications (liens mail / SMS / WhatsApp) de la personne suivante.
 from datetime import date, datetime, timezone
 from typing import Any
@@ -26,17 +28,18 @@ def _actor(p: Principal) -> int | None:
 def _actions(f: dict[str, Any], p: Principal) -> list[str]:
     phase, agent_id, chef = f["phase"], f["agent_id"], f["chef_agent_id"]
     me = p.agent_id
+    on_behalf = p.open or p.has("demande.voir_toutes")  # ADMIN : agit au nom de l'agent ou du chef de service
     out: list[str] = []
     if phase == "A_APPROUVER" and p.has("demande.approuver"):
         # une AFFECTATION (retirer un materiel a son detenteur) demande en plus le droit de transfert
         out = ["approuver", "refuser"] if f["type_demande"] != "AFFECTATION" or p.has("affectation.transferer") else ["refuser"]
-    elif phase == "A_SIGNER_AGENT" and p.has("fiche.signer_agent") and (p.open or me == agent_id):
+    elif phase == "A_SIGNER_AGENT" and p.has("fiche.signer_agent") and (on_behalf or me == agent_id):
         out = ["signer-agent"]
-    elif phase == "A_SIGNER_CHEF" and p.has("fiche.signer_chef") and (p.open or (chef is not None and me == chef)):
+    elif phase == "A_SIGNER_CHEF" and p.has("fiche.signer_chef") and (on_behalf or (chef is not None and me == chef)):
         out = ["signer-chef"]
     elif phase == "A_REMETTRE" and p.has("fiche.remettre"):
         out = ["remettre"]
-    elif phase == "A_APPROUVER_RECEPTION" and p.has("reception.approuver") and (p.open or (chef is not None and me == chef)):
+    elif phase == "A_APPROUVER_RECEPTION" and p.has("reception.approuver") and (on_behalf or (chef is not None and me == chef)):
         out = ["approuver-reception"]
     return out
 
@@ -175,7 +178,9 @@ async def sign_agent(db: AsyncSession, p: Principal, fiche_id: int) -> dict[str,
 async def sign_chef(db: AsyncSession, p: Principal, fiche_id: int) -> dict[str, Any]:
     f, flat = await _load(db, p, fiche_id, "A_SIGNER_CHEF", "signer-chef")
     f.signature_chef_le, f.signature_chef_par = _now(), _actor(p)
-    chef = await db.get(Agent, p.agent_id) if p.agent_id else None
+    # nom du chef de service du demandeur ; a defaut (service sans chef), l'agent rattache au compte qui signe
+    chef_id = flat["chef_agent_id"] or p.agent_id
+    chef = await db.get(Agent, chef_id) if chef_id else None
     f.statut, f.date_signature, f.mode_signature = "SIGNEE", date.today(), "ELECTRONIQUE"
     f.signe_par = f"{chef.prenom} {chef.nom}" if chef else None
     return await _finish(db, p, f, flat, "SIGN_CHEF")

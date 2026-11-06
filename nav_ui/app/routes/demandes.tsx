@@ -18,7 +18,7 @@ const PHASE: Record<string, [string, "ok" | "warn" | "bad" | ""]> = {
   A_APPROUVER: ["À approuver", "warn"], A_SIGNER_AGENT: ["Signature de l’agent", "warn"], A_SIGNER_CHEF: ["Signature du chef de service", "warn"],
   A_REMETTRE: ["Remise du matériel", "warn"], A_APPROUVER_RECEPTION: ["Réception à approuver", "warn"], TERMINEE: ["Terminée", "ok"], CLOTUREE: ["Refusée", "bad"],
 };
-const WAIT: Record<string, string> = { ADMIN: "Dépositaire comptable", LECTURE: "L’agent demandeur", GESTIONNAIRE: "Le chef de service" };
+const WAIT: Record<string, string> = { ADMIN: "Dépositaire comptable" };
 const ACTION: Record<string, string> = {
   approuver: "Approuver", refuser: "Refuser", "signer-agent": "Signer", "signer-chef": "Signer (chef de service)",
   remettre: "Enregistrer la remise", "approuver-reception": "Approuver la réception",

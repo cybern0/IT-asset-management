@@ -234,7 +234,6 @@ export function categoryTabOf(code: string, categories: Row[]): { groupSlug: str
   return c && g ? { groupSlug: g.slug, key: categoryEntity(c, new Set(g.entities.map((e) => e.key))).key } : null;
 }
 
-/* Attributions (processus en étapes) puis Affectations (historique) : menu propre, en tête de la section Assets. */
 /* Section « Demandes et attributions » : circuit de demande (agent -> dépositaire comptable -> signatures -> réception). */
 const demandesTab: Entity = {
   key: "demandes", label: "Demandes de matériel", singular: "une demande", table: "affectation",
@@ -252,36 +251,8 @@ const tracabiliteTab: Entity = {
 
 const attribution: Entity[] = [
   ent({
-    key: "attributions", label: "Attributions", singular: "une attribution", table: "affectation",
+    key: "attributions", label: "Attributions et affectations", singular: "une attribution", table: "affectation",
     custom: "attributions", titleFields: ["id"], fields: [], needs: "parc.lire",
-  }),
-  ent({
-    key: "affectations", label: "Affectations", singular: "une affectation", table: "affectation", needs: "parc.lire",
-    titleFields: ["materiel_id"], subtitleFields: ["agent_id"],
-    badgeFn: (r) => (r.date_retour ? "Rendue" : "Active"),
-    extras: ["fiche"],
-    noCreate: true,
-    fields: [
-      ref("materiel_id", "Matériel", "materiel", { required: true }),
-      ref("agent_id", "Agent", "agent", { required: true }),
-      date("date_remise", "Date de remise", { required: true, default: "today" }),
-      date("date_retour", "Date de retour"),
-      pick("etat_remise", "État à la remise", ETAT),
-      pick("etat_retour", "État au retour", ETAT),
-      ref("cree_par", "Enregistrée par", "utilisateur"),
-      area("observations", "Observations"),
-      created(),
-    ],
-    validate: (d, { rows, selfId }) => {
-      const e: Record<string, string> = {};
-      if (d.date_retour && d.date_remise && d.date_retour < d.date_remise)
-        e.date_retour = "Le retour ne peut pas précéder la remise.";
-      if (!d.date_retour && d.materiel_id &&
-          rows.some((r) => r.id !== selfId && r.materiel_id === d.materiel_id && !r.date_retour))
-        e.materiel_id = "Ce matériel a déjà une affectation active. Enregistrez d’abord son retour.";
-      return e;
-    },
-    seed: [{ materiel_id: "computers-seed-0", agent_id: "a1", date_remise: "2026-09-01", etat_remise: "BON" }],
   }),
 ];
 
@@ -436,7 +407,7 @@ const organisation: Entity[] = [
 const acces: Entity[] = [
   ent({
     key: "users", label: "Users", singular: "un utilisateur", table: "utilisateur",
-    titleFields: ["nom_utilisateur"], subtitleFields: ["role_id"], badgeField: "actif",
+    titleFields: ["nom_utilisateur"], subtitleFields: ["agent_id"], badgeField: "actif",
     fields: [
       ref("agent_id", "Agent", "agent"),
       text("nom_utilisateur", "Nom d’utilisateur", { required: true, unique: true }),
@@ -444,41 +415,11 @@ const acces: Entity[] = [
         api: "mot_de_passe", required: true, placeholder: "Laisser vide pour ne pas le changer",
         hint: "Le serveur stockera uniquement son hash.",
       }),
-      ref("role_id", "Rôle", "role", { required: true }),
       actif(),
       date("derniere_connexion", "Dernière connexion", { readonly: true }),
       created(),
     ],
-    seed: [{ id: "u1", nom_utilisateur: "admin", mot_de_passe_hash: "••••••••", role_id: "ADMIN", actif: "true" }],
-  }),
-  ent({
-    key: "roles", label: "Roles", singular: "un rôle", table: "role",
-    titleFields: ["libelle"], subtitleFields: ["code"],
-    fields: [
-      text("code", "Code", { required: true, unique: true }),
-      text("libelle", "Libellé", { required: true }),
-      multiref("permissions", "Permissions", "permission", { api: "permission_ids" }),
-    ],
-    seed: [
-      { id: "ADMIN", code: "ADMIN", libelle: "Administrateur", permissions: "materiel:lire,materiel:modifier,affectation:creer,stock:gerer,utilisateur:gerer" },
-      { id: "GESTIONNAIRE", code: "GESTIONNAIRE", libelle: "Gestionnaire du parc - Affectation seule", permissions: "materiel:lire,affectation:creer" },
-      { id: "LECTURE", code: "LECTURE", libelle: "Consultation seule", permissions: "materiel:lire" },
-    ],
-  }),
-  ent({
-    key: "permissions", label: "Permissions", singular: "une permission", table: "permission",
-    titleFields: ["libelle"], subtitleFields: ["code"],
-    fields: [
-      text("code", "Code", { required: true, unique: true }),
-      text("libelle", "Libellé", { required: true }),
-    ],
-    seed: [
-      { id: "materiel:lire", code: "materiel:lire", libelle: "Consulter le matériel" },
-      { id: "materiel:modifier", code: "materiel:modifier", libelle: "Créer et modifier le matériel" },
-      { id: "affectation:creer", code: "affectation:creer", libelle: "Affecter et reprendre du matériel" },
-      { id: "stock:gerer", code: "stock:gerer", libelle: "Gérer les stocks de consommables" },
-      { id: "utilisateur:gerer", code: "utilisateur:gerer", libelle: "Gérer les utilisateurs et les rôles" },
-    ],
+    seed: [{ id: "u1", nom_utilisateur: "admin", mot_de_passe_hash: "••••••••", actif: "true" }],
   }),
 ];
 
@@ -551,7 +492,7 @@ export const sections: Section[] = [
     groups: [
       {
         slug: "attribution", label: "Demandes et attributions", icon: "users",
-        description: "Demande de matériel, approbation, signatures (agent puis chef de service), remise et réception ; dossiers d’attribution et historique des affectations.",
+        description: "Demande de matériel, approbation, signatures (agent puis chef de service), remise et réception ; liste unique des attributions et des affectations, avec retour du matériel.",
         entities: [demandesTab, ...attribution],
       },
       {
@@ -571,7 +512,7 @@ export const sections: Section[] = [
     label: "Administration",
     groups: [
       { slug: "organisation", label: "Organisation", icon: "network", description: "Directions, services et agents.", entities: organisation },
-      { slug: "acces", label: "Accès", icon: "users", description: "Comptes utilisateurs, rôles et leurs permissions.", entities: acces },
+      { slug: "acces", label: "Accès", icon: "users", description: "Comptes utilisateurs (administrateurs).", entities: acces },
       { slug: "dictionnaires", label: "Dictionnaires", icon: "layers", description: "Listes de référence utilisées par les formulaires.", entities: dictionnaires },
       { slug: "suivi", label: "Journal d’audit", icon: "clock", description: "Journal des actions effectuées dans l’application.", entities: suivi },
     ],
@@ -594,8 +535,6 @@ export const tableLabel: Record<string, (r: Row) => string> = {
   direction: (r) => r.nom,
   service: (r) => r.nom,
   agent: (r) => `${r.nom} ${r.prenom}`.trim(),
-  role: (r) => r.libelle,
-  permission: (r) => r.libelle,
   utilisateur: (r) => r.nom_utilisateur,
   categorie_materiel: (r) => r.libelle,
   materiel: (r) => (r.code_inventaire ? `${r.designation} (${r.code_inventaire})` : r.designation),
@@ -667,8 +606,6 @@ export const tableEndpoint: Record<string, string> = {
   service: "services",
   agent: "agents",
   utilisateur: "utilisateurs",
-  role: "roles",
-  permission: "permissions",
   categorie_materiel: "categories-materiel",
   materiel: "materiels",
   affectation: "affectations",
@@ -691,6 +628,5 @@ export function fieldsOfTable(table: string): Field[] {
 export const refreshAfter: Record<string, string[]> = {
   affectation: ["materiel"], // statut du materiel
   mouvement_consommable: ["stock_consommable"],
-  permission: ["role"],
   categorie_materiel: ["materiel"],
 };

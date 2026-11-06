@@ -13,12 +13,9 @@ from crud_api.models import Permission, Role, Utilisateur, role_permission
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-# Codes de la table `role` (parc_4.sql, libelles mis a jour par parc_10.sql) :
-#   ADMIN = depositaire comptable, GESTIONNAIRE = gestionnaire d'activite (chef de service), LECTURE = agent standard.
-# Les DROITS ne sont plus codes ici : ils viennent des tables permission / role_permission (parc_10.sql).
+# Un seul role existe dans la table `role` : ADMIN (parc_13.sql supprime GESTIONNAIRE et LECTURE).
+# Les DROITS ne sont pas codes ici : ils viennent des tables permission / role_permission (ADMIN les a tous).
 ADMIN = "ADMIN"
-GESTIONNAIRE = "GESTIONNAIRE"
-LECTURE = "LECTURE"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 

@@ -192,7 +192,7 @@ async def test_only_admin_can_set_signature_when_auth_is_on(db):
     from crud_api.core.deps import require_admin
     from crud_api.core.errors import ForbiddenError
 
-    db.add_all([M.Role(id=1, code="ADMIN", libelle="Administrateur"), M.Role(id=2, code="LECTURE", libelle="Consultation"),
+    db.add_all([M.Role(id=1, code="ADMIN", libelle="Administrateur"), M.Role(id=2, code="AUTRE", libelle="Autre role (non administrateur)"),
                 M.Utilisateur(id=1, nom_utilisateur="admin", mot_de_passe_hash="x", role_id=1),
                 M.Utilisateur(id=2, nom_utilisateur="lecteur", mot_de_passe_hash="x", role_id=2)])
     await db.commit()

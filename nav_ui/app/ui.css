@@ -500,3 +500,19 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 .rq-actions select { max-width: 240px; padding: 7px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
 .rq-table td { vertical-align: top; }
 .rq-table small { color: var(--muted); }
+
+/* Traçabilité : fiche du matériel + parcours chronologique */
+.tl-head { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
+.tl-head:not(:first-child) { margin-top: 20px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 16px; margin: 0; }
+.facts dt { font-size: 12px; color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.tl { list-style: none; margin: 0; padding: 0 0 0 20px; border-left: 2px solid var(--line); display: grid; gap: 16px; }
+.tl-item { position: relative; display: grid; gap: 2px; padding-left: 4px; }
+.tl-item::before { content: ""; position: absolute; left: -28px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--neutral-ink); border: 2px solid var(--surface); }
+.tl-item[data-kind="in"]::before { background: var(--ok-ink); }
+.tl-item[data-kind="out"]::before { background: var(--tag); }
+.tl-item[data-kind="bad"]::before { background: var(--danger); }
+.tl-date { font-size: 12px; color: var(--muted); }
+.tl-title { font-weight: 700; }
+.tl-sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
