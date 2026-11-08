@@ -4,8 +4,6 @@ from tests.test_api import make_agent, make_materiel, post
 
 async def test_parcours_of_a_material(client):
     holder = await make_agent(client, "TR1")
-    chef = await make_agent(client, "TR2")
-    await client.patch(f"/services/{holder['service_id']}", json={"chef_agent_id": chef["id"]})
     m = await make_materiel(client, "ORD-TR", date_acquisition="2026-01-10", provenance="ACHAT")
 
     # materiel neuf : acquisition + enregistrement, aucun detenteur
@@ -13,19 +11,14 @@ async def test_parcours_of_a_material(client):
     assert [e["type"] for e in p["evenements"]] == ["ACQUISITION", "ENREGISTREMENT"]
     assert p["materiel"]["detenteur"] is None and p["materiel"]["code_inventaire"] == "ORD-TR"
 
-    # circuit complet (API ouverte : le meme compte fait chaque etape)
-    d = await post(client, "/demandes", {"type_demande": "ATTRIBUTION", "agent_id": holder["id"], "besoin": "PC"})
-    await post(client, f"/demandes/{d['id']}/approuver", {"materiel_id": m["id"]}, 200)
-    for step in ("signer-agent", "signer-chef"):
-        await post(client, f"/demandes/{d['id']}/{step}", {}, 200)
-    await post(client, f"/demandes/{d['id']}/remettre", {}, 200)
-    await post(client, f"/demandes/{d['id']}/approuver-reception", {}, 200)
+    # attribution en une saisie (API ouverte : le meme compte fait tout)
+    d = await post(client, "/attributions/directe", {"agent_id": holder["id"], "materiel_id": m["id"], "besoin": "PC", "signee": True})
 
     p = (await client.get(f"/tracabilite/{m['id']}")).json()
     types = [e["type"] for e in p["evenements"]]
     assert types[:2] == ["ACQUISITION", "ENREGISTREMENT"] or set(types[:2]) == {"ACQUISITION", "ENREGISTREMENT"}
-    circuit = [t for t in types if t in ("DEMANDE", "APPROBATION", "SIGNATURE_AGENT", "SIGNATURE_CHEF", "REMISE", "RECEPTION")]
-    assert circuit == ["DEMANDE", "APPROBATION", "SIGNATURE_AGENT", "SIGNATURE_CHEF", "REMISE", "RECEPTION"]
+    circuit = [t for t in types if t in ("DEMANDE", "APPROBATION", "SIGNATURE", "REMISE")]
+    assert circuit == ["DEMANDE", "APPROBATION", "SIGNATURE", "REMISE"]
     assert "AFFECTATION_DIRECTE" not in types  # l'affectation est portee par le dossier : pas de doublon
     remise = next(e for e in p["evenements"] if e["type"] == "REMISE")
     assert remise["agent"] == "Jean Rakoto" and remise["reference"] == d["reference"]

@@ -16,7 +16,7 @@ from crud_api.core.errors import ConflictError, NotFoundError, UnprocessableErro
 from crud_api.models import (
     Affectation, Agent, CategorieMateriel, Direction, FicheDetention, Materiel, Service, Utilisateur,
 )
-from crud_api.schemas.fiche import ACCESSOIRES, AttributionCreate, AvancerIn, SignatureIn
+from crud_api.schemas.fiche import ACCESSOIRES, AttributionCreate, AttributionDirecteIn, AvancerIn, SignatureIn
 from crud_api.services import audit_service
 
 _LOCK_KEY = 7240011  # verrou applicatif : numerotation sans doublon
@@ -54,7 +54,7 @@ def phase_of(f: FicheDetention) -> str:
     return "TERMINEE" if f.reception_approuvee_le else "A_APPROUVER_RECEPTION"
 
 
-# Un seul role : ADMIN fait toutes les etapes, au nom de l'agent et du chef de service (circuit_service, parc_14.sql)
+# Un seul role : ADMIN fait toutes les etapes, au nom de l'agent et du chef de service (parc_14.sql)
 ROLE_ATTENDU = {
     "A_APPROUVER": "ADMIN", "A_SIGNER_AGENT": "ADMIN", "A_SIGNER_CHEF": "ADMIN",
     "A_REMETTRE": "ADMIN", "A_APPROUVER_RECEPTION": "ADMIN",
@@ -205,6 +205,44 @@ async def create_request(db: AsyncSession, data: AttributionCreate) -> dict[str,
     db.add(fiche)
     await db.flush()
     return await _done(db, fiche, "CREATE", {"reference": fiche.reference})
+
+
+# ----------------------------- attribution en une saisie -----------------------------
+async def create_direct(db: AsyncSession, data: AttributionDirecteIn) -> dict[str, Any]:
+    """Les 6 etapes en une seule saisie (le depositaire comptable est le seul utilisateur : il valide, choisit l'equipement,
+    note la signature et la remise d'un coup). Le dossier obtenu est identique a celui du pas a pas : meme reference,
+    meme fiche PDF, meme parcours. Une seule transaction : la validation est celle de la creation de l'affectation."""
+    agent = await db.get(Agent, data.agent_id)
+    if agent is None or not agent.actif:
+        raise UnprocessableError("Agent introuvable ou inactif.", field="agent_id")
+    m = await db.get(Materiel, data.materiel_id)
+    if m is None:
+        raise UnprocessableError("Matériel introuvable.", field="materiel_id")
+    remise = data.date_remise or date.today()
+    demande = data.date_demande or remise
+    if demande > remise:
+        raise UnprocessableError("La demande ne peut pas être postérieure à la remise.", field="date_demande")
+    actor_id = db.info.get("actor_id")
+    actor = await db.get(Utilisateur, actor_id) if actor_id else None
+    fiche = FicheDetention(
+        reference=await _next_reference(db), agent_id=agent.id, categorie_id=m.categorie_id,
+        besoin=data.besoin, canal=data.canal, reference_canal=data.reference_canal, demandeur=data.demandeur,
+        date_demande=demande, valide_par=data.valide_par or (actor.nom_utilisateur if actor else "Dépositaire comptable"),
+        date_validation=demande,
+    )
+    db.add(fiche)
+    await db.flush()
+    await _reserve(db, fiche, m.id)  # en stock et pas reserve par un autre dossier
+    fiche.materiel_id, fiche.date_generation = m.id, remise
+    if data.signee:
+        fiche.statut, fiche.date_signature = "SIGNEE", data.date_signature or remise
+        fiche.mode_signature, fiche.signe_par = data.mode_signature or "MANUSCRITE", data.signe_par
+    await audit_service.record(db, "CREATE", "fiche_detention", fiche.id, {"reference": fiche.reference, "directe": True})
+    remise_data = AvancerIn(
+        etat_constate=data.etat_constate, accessoires=data.accessoires, accessoires_autre=data.accessoires_autre,
+        observations=data.observations,
+    )
+    return await _hand_over(db, fiche, remise_data, remise)  # cree l'affectation (commit) : materiel « Attribue »
 
 
 # ----------------------------- etape suivante / etape precedente / cloture -----------------------------

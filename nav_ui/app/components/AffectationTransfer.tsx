@@ -24,7 +24,7 @@ export function NewTransfer({ onCancel, onDone }: { onCancel: () => void; onDone
 
   // materiels actuellement detenus : recharges a l'ouverture du formulaire
   useEffect(() => {
-    api.get<Options>("/demandes/options").then((o) => setDetenus(o.detenus))
+    api.get<Options>("/circuit/options").then((o) => setDetenus(o.detenus))
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : t("Erreur inattendue.")));
   }, [t]);
 

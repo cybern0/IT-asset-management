@@ -7,7 +7,7 @@ from crud_api.config import get_settings
 from crud_api.core.database import get_db
 from crud_api.core.deps import require_admin
 from crud_api.core.errors import ConflictError, NotFoundError
-from crud_api.schemas.fiche import AttributionCreate, AttributionOut, AvancerIn, MotifIn, SignatureIn
+from crud_api.schemas.fiche import AttributionCreate, AttributionDirecteIn, AttributionOut, AvancerIn, MotifIn, SignatureIn
 from crud_api.schemas.materiel import MaterielOut
 from crud_api.services import audit_service, fiche_pdf, fiche_service, file_store
 from crud_api.services.materiel_service import materiel_service
@@ -28,6 +28,12 @@ async def list_attributions(db: AsyncSession = Depends(get_db), limit: int = Que
 async def create_attribution(data: AttributionCreate, db: AsyncSession = Depends(get_db)):
     """Etape 1 : demande d'equipement (valide_par renseigne si le manager a deja valide)."""
     return await fiche_service.create_request(db, data)
+
+
+@router.post("/attributions/directe", response_model=AttributionOut, status_code=201, tags=TAG)
+async def create_attribution_directe(data: AttributionDirecteIn, db: AsyncSession = Depends(get_db)):
+    """Attribution en une saisie : demande, equipement, fiche, signature et remise enregistrees ensemble."""
+    return await fiche_service.create_direct(db, data)
 
 
 @router.get("/attributions/{fiche_id}", response_model=AttributionOut, tags=TAG)

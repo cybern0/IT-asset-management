@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from crud_api.schemas.common import ORMModel, OptDate, OptS, OptText, S
+from crud_api.schemas.common import ORMModel, OptDate, OptS, OptText
 
 CANAL = Literal["MAIL", "TICKET", "FORMULAIRE"]
 ACCESSOIRES = ("Chargeur", "Sacoche", "Docking", "Souris", "Clavier")
@@ -20,6 +20,31 @@ class AttributionCreate(BaseModel):
     demandeur: OptS(150) = None
     date_demande: OptDate = None  # defaut : aujourd'hui
     valide_par: OptS(150) = None  # renseigne si le manager a deja valide
+
+
+class AttributionDirecteIn(BaseModel):
+    """Attribution en une seule saisie : le dossier est cree, l'equipement reserve, la fiche generee, la signature
+    (si elle a eu lieu) et la remise enregistrees, puis le materiel passe a « Attribue ». Tout est valide ensemble,
+    ou rien. La demande (canal, demandeur, manager...) est facultative : elle ne sert qu'a garder une trace."""
+
+    agent_id: int
+    materiel_id: int
+    date_remise: OptDate = None  # defaut : aujourd'hui
+    etat_constate: Literal["NEUF", "BON", "A_REPARER"] | None = None  # defaut : etat du materiel
+    accessoires: list[Literal["Chargeur", "Sacoche", "Docking", "Souris", "Clavier"]] = []
+    accessoires_autre: OptS(100) = None
+    observations: OptText = None
+    signee: bool = False  # la fiche est deja signee ; sinon elle reste « a signer » (voir SignatureIn)
+    date_signature: OptDate = None  # defaut : date de remise
+    mode_signature: Literal["MANUSCRITE", "ELECTRONIQUE"] | None = None  # defaut : manuscrite
+    signe_par: OptS(150) = None
+    # trace de la demande (facultatif)
+    besoin: OptText = None
+    canal: CANAL = "FORMULAIRE"
+    reference_canal: OptS(120) = None
+    demandeur: OptS(150) = None
+    date_demande: OptDate = None  # defaut : date de remise
+    valide_par: OptS(150) = None  # manager qui a valide ; defaut : le compte qui saisit
 
 
 class MotifIn(BaseModel):

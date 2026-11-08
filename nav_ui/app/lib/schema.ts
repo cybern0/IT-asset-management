@@ -62,7 +62,7 @@ export type Entity = {
   /** Pas de bouton + (la creation passe par un autre circuit, ex. Attributions). */
   noCreate?: boolean;
   /** Onglet a ecran dedie (au lieu du CRUD generique). */
-  custom?: "attributions" | "affectations" | "demandes";
+  custom?: "attributions" | "affectations";
   /** Permission (code role_permission) exigee pour voir cet onglet ; sans elle, l'onglet est masque. */
   needs?: string;
   readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
