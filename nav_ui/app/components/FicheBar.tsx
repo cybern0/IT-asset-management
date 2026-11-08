@@ -41,7 +41,9 @@ export function FicheBar({ affectationId, version }: { affectationId: string; ve
             </div>
             <div className="fiche-row">
               <button type="button" className="btn primary" onClick={() => void run(() => downloadPdf(fiche))}>{t("Exporter en PDF")}</button>
-              <Link className="btn ghost" to="/circuit/attribution/attributions">{t("Ouvrir dans Attributions")}</Link>
+              <Link className="btn ghost" to={fiche.type_demande === "AFFECTATION" ? "/circuit/attribution/affectations" : "/circuit/attribution/attributions"}>
+                {fiche.type_demande === "AFFECTATION" ? t("Ouvrir dans Affectations") : t("Ouvrir dans Attributions")}
+              </Link>
             </div>
           </div>
         )}

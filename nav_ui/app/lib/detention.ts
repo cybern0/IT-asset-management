@@ -14,6 +14,7 @@ export type Attribution = {
   accessoires_autre: string | null; observations_remise: string | null;
   affectation_id: number | null; date_retour: string | null; etat_retour: string | null;
   type_demande?: "ATTRIBUTION" | "AFFECTATION"; // AFFECTATION = transfert d'un materiel deja detenu
+  ancien_agent_id?: number | null; // affectation : detenteur dont le materiel a ete retire
   phase?: string | null; role_attendu?: string | null; // etape du circuit de demande et qui doit agir ensuite (toujours ADMIN)
   observations: string | null; saisi_par: string | null; cloture: "REFUSEE" | "ANNULEE" | null; motif_cloture: string | null;
   materiel_id: number | null; materiel_code: string | null; materiel_designation: string | null;

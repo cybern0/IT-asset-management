@@ -59,7 +59,8 @@ export default function Module() {
               {t("Cette rubrique n’existe pas encore dans parc.sql : les champs sont provisoires.")}
             </p>
           )}
-          {entity?.custom === "attributions" && <AttributionsView />}
+          {entity?.custom === "attributions" && <AttributionsView mode="ATTRIBUTION" />}
+          {entity?.custom === "affectations" && <AttributionsView mode="AFFECTATION" />}
           {entity?.custom === "repartition" && <RepartitionView />}
           {entity?.custom === "tracabilite" && <TracabiliteView />}
           {entity && !entity.custom && <CrudPanel key={entity.key} entity={entity} />}

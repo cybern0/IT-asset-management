@@ -8,27 +8,36 @@ import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { tone } from "../lib/schema";
 import { useStore } from "../lib/store";
-import { AffectationTransfer } from "./AffectationTransfer";
+import { NewTransfer } from "./AffectationTransfer";
 import { AttributionSteps } from "./AttributionSteps";
 
 const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** Liste unique « Attributions et affectations » : chaque dossier est une attribution (materiel sans detenteur) ou une
- *  affectation (transfert d'un materiel deja detenu) ; son detail montre le circuit en 6 etapes puis le retour du materiel. */
+export type Mode = "ATTRIBUTION" | "AFFECTATION";
+
 /** Fiche generee (equipement choisi), pas encore signee, dossier non clos. */
 const needsSignature = (d: Attribution) => d.cloture === null && d.materiel_id !== null && d.statut !== "SIGNEE";
 
-export function AttributionsView() {
+/** Liste + detail d'une rubrique du circuit. Meme mise en page pour les deux :
+ *  - ATTRIBUTION : un materiel sans detenteur est donne a un agent (bouton + : nouvelle demande d'equipement) ;
+ *  - AFFECTATION : un materiel deja detenu est retire a son detenteur et donne a un autre agent (bouton + : transfert).
+ *  Chaque dossier garde son circuit en 6 etapes puis le retour du materiel. */
+export function AttributionsView({ mode }: { mode: Mode }) {
   const { t } = useI18n();
   const { can, has } = useAuth();
+  const { rows } = useStore();
+  const isAff = mode === "AFFECTATION";
+  const title = isAff ? t("Affectations") : t("Attributions");
+  const canCreate = isAff ? has("affectation.transferer") : can("write");
+  const addLabel = isAff ? t("Nouvelle affectation") : t("Nouvelle demande d’équipement");
+
   const [items, setItems] = useState<Attribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [etat, setEtat] = useState("");
   const [sig, setSig] = useState("");
-  const [type, setType] = useState("");
   const [selected, setSelected] = useState<number | "new" | null>(null);
 
   const load = useCallback(async () => {
@@ -40,32 +49,37 @@ export function AttributionsView() {
   }, [t]);
 
   useEffect(() => { void load(); }, [load]);
+  // changer de rubrique repart d'une liste propre
+  useEffect(() => { setSelected(null); setQuery(""); setEtat(""); setSig(""); }, [mode]);
+
+  const agentById = useMemo(() => new Map((rows.agent ?? []).map((a) => [Number(a.id), `${a.nom} ${a.prenom}`.trim()])), [rows.agent]);
+  const ancien = (d: Attribution) => (d.ancien_agent_id ? agentById.get(d.ancien_agent_id) ?? "" : "");
+
+  const ofMode = useMemo(() => items.filter((d) => (d.type_demande ?? "ATTRIBUTION") === mode), [items, mode]);
 
   const visible = useMemo(() => {
     const q = norm(query.trim());
-    return items.filter((d) => {
+    return ofMode.filter((d) => {
       if (etat && d.etat !== etat) return false;
-      if (type && (d.type_demande ?? "ATTRIBUTION") !== type) return false;
-      if (sig === "A_SIGNER" && !(needsSignature(d))) return false;
+      if (sig === "A_SIGNER" && !needsSignature(d)) return false;
       if (sig === "SIGNEE" && d.statut !== "SIGNEE") return false;
       if (!q) return true;
-      return norm(`${d.reference} ${agentName(d)} ${d.agent_matricule} ${d.materiel_designation ?? ""} ${d.materiel_code ?? ""}`).includes(q);
+      return norm(`${d.reference} ${agentName(d)} ${d.agent_matricule} ${ancien(d)} ${d.materiel_designation ?? ""} ${d.materiel_code ?? ""}`).includes(q);
     });
-  }, [items, query, etat, sig, type]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ofMode, query, etat, sig, agentById]);
 
-  const current = typeof selected === "number" ? items.find((d) => d.id === selected) ?? null : null;
+  const current = typeof selected === "number" ? ofMode.find((d) => d.id === selected) ?? null : null;
   const replace = (f: Attribution) => setItems((list) => list.map((d) => (d.id === f.id ? f : d)));
+  const filtered = Boolean(query || etat || sig);
 
   return (
-    <>
-    {has("affectation.transferer") && <AffectationTransfer onDone={() => void load()} />}
     <div className="crud">
-      <section className="pane" aria-label={t("Liste : {x}", { x: t("Attributions et affectations") })}>
+      <section className="pane" aria-label={t("Liste : {x}", { x: title })}>
         <div className="pane-head">
-          <h2>{t("Attributions et affectations")} <span className="count">{visible.length}</span></h2>
-          {can("write") && (
-            <button type="button" className="add-btn" onClick={() => setSelected("new")}
-              aria-label={t("Nouvelle demande d’équipement")} title={t("Nouvelle demande d’équipement")}>
+          <h2>{title} <span className="count">{visible.length}</span></h2>
+          {canCreate && (
+            <button type="button" className="add-btn" onClick={() => setSelected("new")} aria-label={addLabel} title={addLabel}>
               <Icon name="plus" />
             </button>
           )}
@@ -80,11 +94,6 @@ export function AttributionsView() {
             <option value="">{t("Tous les dossiers")}</option>
             {Object.entries(ETAT_LABEL).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
           </select>
-          <select value={type} onChange={(e) => setType(e.target.value)} aria-label={t("Type de demande")}>
-            <option value="">{t("Tous les types")}</option>
-            <option value="ATTRIBUTION">{t("Attribution")}</option>
-            <option value="AFFECTATION">{t("Affectation (transfert)")}</option>
-          </select>
           <select value={sig} onChange={(e) => setSig(e.target.value)} aria-label={t("État de la fiche")}>
             <option value="">{t("Toutes les fiches")}</option>
             <option value="A_SIGNER">{t("À signer")}</option>
@@ -97,13 +106,15 @@ export function AttributionsView() {
             : loading && items.length === 0 ? <p className="empty">{t("Chargement…")}</p>
             : visible.length === 0 ? (
               <p className="empty">
-                {items.length > 0 ? t("Aucun résultat pour ce filtre.")
-                  : t("Aucune attribution ni affectation pour l’instant. Utilisez le bouton + pour enregistrer une demande.")}
+                {filtered && ofMode.length > 0 ? t("Aucun résultat pour ce filtre.")
+                  : isAff ? t("Aucune affectation pour l’instant. Utilisez le bouton + pour affecter un matériel déjà détenu à un autre agent.")
+                  : t("Aucune attribution pour l’instant. Utilisez le bouton + pour enregistrer une demande.")}
               </p>
             ) : (
               <ul className="items">
                 {visible.map((d) => {
                   const label = d.etat === "EN_COURS" ? `${t("Étape")} ${d.etape}/6` : t(ETAT_LABEL[d.etat]);
+                  const from = isAff ? ancien(d) : "";
                   return (
                     <li key={d.id}>
                       <button type="button" className="item" aria-current={selected === d.id} onClick={() => setSelected(d.id)}>
@@ -111,10 +122,10 @@ export function AttributionsView() {
                           <span className="item-title">{agentName(d)}</span>
                           <span className="item-sub">
                             {d.reference} · {d.materiel_designation ?? d.categorie_demandee ?? t("Équipement à choisir")}
+                            {from && ` · ${t("de")} ${from}`}
                           </span>
                         </span>
                         <span className="badges">
-                          {d.type_demande === "AFFECTATION" && <span className="badge" data-tone="neutral">{t("Transfert")}</span>}
                           {needsSignature(d) && <span className="badge" data-tone="warn">{t("À signer")}</span>}
                           <span className="badge" data-tone={d.etat === "EN_COURS" ? "warn" : tone(ETAT_LABEL[d.etat])}>{label}</span>
                         </span>
@@ -129,10 +140,17 @@ export function AttributionsView() {
 
       <section className="pane" aria-label={t("Détail")}>
         {selected === "new" ? (
-          <NewRequest
-            onCancel={() => setSelected(null)}
-            onCreated={(f) => { setItems((l) => [f, ...l]); setSelected(f.id); }}
-          />
+          isAff ? (
+            <NewTransfer
+              onCancel={() => setSelected(null)}
+              onDone={() => { setSelected(null); void load(); }}
+            />
+          ) : (
+            <NewRequest
+              onCancel={() => setSelected(null)}
+              onCreated={(f) => { setItems((l) => [f, ...l]); setSelected(f.id); }}
+            />
+          )
         ) : current ? (
           <div className="form" key={current.id}>
             <div className="pane-head">
@@ -152,12 +170,14 @@ export function AttributionsView() {
           </div>
         ) : (
           <div className="pane-body">
-            <p className="empty">{t("Sélectionnez un dossier dans la liste, ou cliquez sur + pour enregistrer une demande.")}</p>
+            <p className="empty">
+              {isAff ? t("Sélectionnez une affectation dans la liste, ou cliquez sur + pour affecter un matériel à un autre agent.")
+                : t("Sélectionnez un dossier dans la liste, ou cliquez sur + pour enregistrer une demande.")}
+            </p>
           </div>
         )}
       </section>
     </div>
-    </>
   );
 }
 

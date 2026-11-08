@@ -62,7 +62,7 @@ export type Entity = {
   /** Pas de bouton + (la creation passe par un autre circuit, ex. Attributions). */
   noCreate?: boolean;
   /** Onglet a ecran dedie (au lieu du CRUD generique). */
-  custom?: "attributions" | "demandes" | "repartition" | "tracabilite";
+  custom?: "attributions" | "affectations" | "demandes" | "repartition" | "tracabilite";
   /** Permission (code role_permission) exigee pour voir cet onglet ; sans elle, l'onglet est masque. */
   needs?: string;
   readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
@@ -246,8 +246,12 @@ const tracabiliteTab: Entity = {
 
 const attribution: Entity[] = [
   ent({
-    key: "attributions", label: "Attributions et affectations", singular: "une attribution", table: "affectation",
+    key: "attributions", label: "Attributions", singular: "une attribution", table: "affectation",
     custom: "attributions", titleFields: ["id"], fields: [], needs: "parc.lire",
+  }),
+  ent({
+    key: "affectations", label: "Affectations", singular: "une affectation", table: "affectation",
+    custom: "affectations", titleFields: ["id"], fields: [], needs: "parc.lire",
   }),
 ];
 
@@ -487,7 +491,7 @@ export const sections: Section[] = [
     groups: [
       {
         slug: "attribution", label: "Attributions et affectations", icon: "users",
-        description: "Demande de matériel, approbation, signatures (agent puis chef de service), remise et réception ; liste unique des attributions et des affectations, avec retour du matériel.",
+        description: "Demande de matériel, approbation, signatures (agent puis chef de service), remise et réception ; deux rubriques : les attributions (matériel sans détenteur) et les affectations (transfert d’un matériel déjà détenu), avec retour du matériel.",
         entities: attribution,
       },
       {
