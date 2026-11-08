@@ -6,7 +6,7 @@
 export type RoleCode = "ADMIN";
 /** Raccourcis historiques des composants (CrudPanel...) : lecture / ecriture / suppression du parc. */
 export type Permission = "read" | "write" | "delete";
-export type Area = "dashboard" | "circuit" | "assets" | "administration";
+export type Area = "dashboard" | "global" | "circuit" | "assets" | "administration";
 
 export const ROLE_LABEL: Record<RoleCode, string> = {
   ADMIN: "Dépositaire comptable (administrateur)",
@@ -19,7 +19,8 @@ export const LEGACY_PERMISSION: Record<Permission, string> = {
 /** Permissions dont UNE SEULE suffit pour voir chaque zone du menu. */
 export const AREA_PERMISSIONS: Record<Area, string[]> = {
   dashboard: ["dashboard.voir", "dashboard.repartition"],
-  circuit: ["demande.creer", "demande.voir_propres", "demande.voir_service", "demande.voir_toutes", "dashboard.repartition"],
+  circuit: ["demande.creer", "demande.voir_propres", "demande.voir_service", "demande.voir_toutes"],
+  global: ["parc.lire"],
   assets: ["parc.lire"],
   administration: ["acces.gerer"],
 };

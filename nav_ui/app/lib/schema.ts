@@ -62,7 +62,7 @@ export type Entity = {
   /** Pas de bouton + (la creation passe par un autre circuit, ex. Attributions). */
   noCreate?: boolean;
   /** Onglet a ecran dedie (au lieu du CRUD generique). */
-  custom?: "attributions" | "affectations" | "demandes" | "repartition" | "tracabilite";
+  custom?: "attributions" | "affectations" | "demandes";
   /** Permission (code role_permission) exigee pour voir cet onglet ; sans elle, l'onglet est masque. */
   needs?: string;
   readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
@@ -86,7 +86,6 @@ export type Group = {
   label: string;
   description: string;
   icon: IconName;
-  kind?: "crud" | "global";
   /** Permission exigee pour voir ce menu (voir Entity.needs). */
   needs?: string;
   /** Valeur de categorie_materiel.category_menu dont les categories alimentent ce menu (onglets generes). */
@@ -233,16 +232,6 @@ export function categoryTabOf(code: string, categories: Row[]): { groupSlug: str
   const g = c && groupOfMenu(c.category_menu);
   return c && g ? { groupSlug: g.slug, key: categoryEntity(c, new Set(g.entities.map((e) => e.key))).key } : null;
 }
-
-const repartitionTab: Entity = {
-  key: "repartition", label: "Répartition", singular: "une répartition", table: "affectation",
-  custom: "repartition", titleFields: ["id"], fields: [],
-};
-
-const tracabiliteTab: Entity = {
-  key: "tracabilite", label: "Traçabilité des matériels", singular: "une traçabilité", table: "affectation",
-  custom: "tracabilite", titleFields: ["id"], fields: [],
-};
 
 const attribution: Entity[] = [
   ent({
@@ -482,7 +471,6 @@ export const sections: Section[] = [
       { slug: "reseau", label: "Réseau et baies", icon: "network", categoryMenu: "Réseau", categoriesFirst: true, description: "Équipements réseau, baies, câblage, cartes SIM : même table matériel, une catégorie par onglet.", entities: [] },
       { slug: "consommables", label: "Consommables et stocks", icon: "printer", categoryMenu: "Consommables et stocks", description: "Articles, stocks par service et mouvements d’entrée, sortie et transfert.", entities: consommables },
       { slug: "logiciels", label: "Logiciels", icon: "layers", categoryMenu: "Logiciels", description: "Logiciels installés et licences associées.", entities: logiciels },
-      { slug: "global", label: "Global", icon: "globe", kind: "global", description: "Recherche dans tout le matériel et liste croisée matériel × agent détenteur, avec fiches de détention.", entities: [] },
     ],
   },
   {
@@ -493,16 +481,6 @@ export const sections: Section[] = [
         slug: "attribution", label: "Attributions et affectations", icon: "users",
         description: "Demande de matériel, approbation, signatures (agent puis chef de service), remise et réception ; deux rubriques : les attributions (matériel sans détenteur) et les affectations (transfert d’un matériel déjà détenu), avec retour du matériel.",
         entities: attribution,
-      },
-      {
-        slug: "repartition", label: "Répartition", icon: "layers", needs: "dashboard.repartition",
-        description: "Matériel détenu par service, avec le nombre d’agents et de matériels par catégorie du dictionnaire.",
-        entities: [repartitionTab],
-      },
-      {
-        slug: "tracabilite", label: "Traçabilité des matériels", icon: "clock", needs: "dashboard.repartition",
-        description: "Suivi du parcours de chaque matériel : détenteurs successifs, transferts et retours.",
-        entities: [tracabiliteTab],
       },
     ],
   },

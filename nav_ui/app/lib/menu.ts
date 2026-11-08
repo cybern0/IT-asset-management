@@ -21,7 +21,7 @@ export function useMenu() {
       /** false tant que les categories ne sont pas chargees (evite un menu qui clignote). */
       ready: status !== "loading",
       entitiesOf,
-      groupsOf: (s: Section): Group[] => s.groups.filter((g) => (!g.needs || permissions.includes(g.needs)) && (g.kind === "global" || entitiesOf(g).length > 0)),
+      groupsOf: (s: Section): Group[] => s.groups.filter((g) => (!g.needs || permissions.includes(g.needs)) && entitiesOf(g).length > 0),
       /** Onglet qui affiche une categorie (liens de la vue Global), null si elle n'a pas de menu. */
       tabOf: (code: string) => categoryTabOf(code, categories),
     };

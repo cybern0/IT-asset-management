@@ -41,6 +41,8 @@ async def test_parcours_of_a_material(client):
     # liste resumee
     row = next(r for r in (await client.get("/tracabilite")).json() if r["id"] == m["id"])
     assert row["nb_detenteurs"] == 1 and row["detenteur"] is None
+    # champs de recherche de la vue Global > Materiel
+    assert row["categorie_code"] == "ORDINATEUR" and {"marque", "modele", "numero_serie", "localisation"} <= row.keys()
 
 
 async def test_direct_assignment_and_unknown_material(client):

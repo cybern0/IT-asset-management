@@ -34,15 +34,25 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav" aria-label={t("Navigation principale")}>
-        {has("dashboard.voir") && (
+        {(has("dashboard.voir") || has("dashboard.repartition") || has("parc.lire")) && (
           <div className="nav-section">
             <ul>
-              <li>
-                <NavLink to="/dashboard" end className="nav-link" title={t("Tableau de bord")}>
-                  <Icon name="dashboard" />
-                  <span className="label">{t("Tableau de bord")}</span>
-                </NavLink>
-              </li>
+              {(has("dashboard.voir") || has("dashboard.repartition")) && (
+                <li>
+                  <NavLink to="/dashboard" className="nav-link" title={t("Tableau de bord")}>
+                    <Icon name="dashboard" />
+                    <span className="label">{t("Tableau de bord")}</span>
+                  </NavLink>
+                </li>
+              )}
+              {has("parc.lire") && (
+                <li>
+                  <NavLink to="/global" className="nav-link" title={t("Global")}>
+                    <Icon name="globe" />
+                    <span className="label">{t("Global")}</span>
+                  </NavLink>
+                </li>
+              )}
             </ul>
           </div>
         )}

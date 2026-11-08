@@ -55,7 +55,8 @@ async def summary(db: AsyncSession) -> list[dict[str, Any]]:
         last = max([d for d in (_day(m.cree_le), st and st.last_in, st and st.last_out) if d])
         out.append({
             "id": m.id, "code_inventaire": m.code_inventaire, "designation": m.designation,
-            "categorie": m.categorie.libelle, "statut": m.statut, "etat": m.etat,
+            "categorie": m.categorie.libelle, "categorie_code": m.categorie.code, "statut": m.statut, "etat": m.etat,
+            "marque": m.marque, "modele": m.modele, "numero_serie": m.numero_serie, "localisation": m.localisation,
             "detenteur": _agent_name(held[1], held[0].agent_nom) if held else None,
             "service": held[2].nom if held and held[2] else None,
             "depuis": held[0].date_remise if held else None,

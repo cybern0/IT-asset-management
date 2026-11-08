@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { api, ApiError } from "../lib/api";
 import {
   agentName, CANAL_LABEL, downloadPdf, ETAT_LABEL, ETAT_MATERIEL_LABEL, ficheLabel, fmtDate, MODE_LABEL,
@@ -100,7 +101,10 @@ export function DetentionView() {
                   <td>{fmtDate(d.date_remise) || "—"}</td>
                   <td><span className="badge" data-tone={d.etat === "EN_COURS" ? "warn" : tone(ETAT_LABEL[d.etat])}>{d.etat === "EN_COURS" ? `${t("Étape")} ${d.etape}/6` : t(ETAT_LABEL[d.etat])}</span></td>
                   <td><span className="badge" data-tone={tone(ficheLabel(d))}>{t(ficheLabel(d))}</span></td>
-                  <td><button type="button" className="btn ghost" onClick={() => setOpenId(d.id)}>{t("Voir")}</button></td>
+                  <td>
+                    <button type="button" className="btn ghost" onClick={() => setOpenId(d.id)}>{t("Voir")}</button>{" "}
+                    <Link className="btn ghost" to={`/global?materiel=${d.materiel_id}`}>{t("Parcours")}</Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

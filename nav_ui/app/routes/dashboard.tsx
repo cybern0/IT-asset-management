@@ -37,7 +37,7 @@ type Fmt = ReturnType<typeof useFormat>;
 /** L'administrateur voit la vue d'ensemble ; un compte sans le droit dashboard.voir arrive directement sur la repartition. */
 export default function Dashboard() {
   const { has } = useAuth();
-  return has("dashboard.voir") ? <Overview /> : <Navigate to="/circuit/repartition/repartition" replace />;
+  return has("dashboard.voir") ? <Overview /> : <Navigate to="/dashboard/repartition" replace />;
 }
 
 function Overview() {

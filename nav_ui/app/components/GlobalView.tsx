@@ -1,79 +1,19 @@
-import { useState } from "react";
-import { Link, NavLink } from "react-router";
+import { NavLink } from "react-router";
 import { DetentionView } from "./DetentionView";
-import { Icon } from "../lib/icons";
+import { TracabiliteView } from "./TracabiliteView";
 import { useI18n } from "../lib/i18n";
-import { useMenu } from "../lib/menu";
-import { assetEntities, showValue, viewOf } from "../lib/schema";
-import { useStore } from "../lib/store";
 
-const entity = assetEntities.find((a) => a.entity.table === "materiel")!.entity;
-
+/** Racine Global : deux rubriques. « Matériel » = liste de tout le materiel + parcours du materiel choisi
+ *  (ancienne Tracabilite) ; « Detentions » = liste croisee materiel x agent detenteur avec fiches. */
 export function GlobalView({ tab }: { tab?: string }) {
   const { t } = useI18n();
   return (
     <>
       <nav className="tabs" aria-label={t("Global")}>
-        <NavLink to="/assets/global" end className="tab">{t("Matériel")}</NavLink>
-        <NavLink to="/assets/global/detentions" className="tab">{t("Détentions")}</NavLink>
+        <NavLink to="/global" end className="tab">{t("Matériel")}</NavLink>
+        <NavLink to="/global/detentions" className="tab">{t("Détentions")}</NavLink>
       </nav>
-      {tab === "detentions" ? <DetentionView /> : <MaterielSearch />}
+      {tab === "detentions" ? <DetentionView /> : <TracabiliteView />}
     </>
-  );
-}
-
-function MaterielSearch() {
-  const { rows, ctx } = useStore();
-  const { tabOf } = useMenu();
-  const { t } = useI18n();
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-
-  const items = (rows.materiel ?? [])
-    .map((r) => {
-      const v = viewOf(entity, r, ctx);
-      const tab = tabOf(r.categorie_code);
-      return {
-        id: r.id,
-        type: ctx.label("categorie_materiel", r.categorie_id) || t("Sans catégorie"),
-        to: tab ? `/assets/${tab.groupSlug}/${tab.key}` : null,
-        ...v,
-        haystack: entity.fields.map((f) => showValue(f, r[f.name], ctx)).join(" ").toLowerCase(),
-      };
-    })
-    .filter((i) => !q || i.haystack.includes(q));
-
-  return (
-    <section className="pane global">
-      <label className="search">
-        <Icon name="search" size={16} />
-        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("Rechercher dans tout le matériel")} aria-label={t("Rechercher dans tout le matériel")} />
-      </label>
-      <div className="pane-body">
-        {items.length === 0 ? (
-          <p className="empty">{t("Aucun matériel ne correspond.")}</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t("Catégorie")}</th><th>{t("Désignation")}</th>
-                <th>{t("Code d’inventaire")}</th><th>{t("Statut")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((i) => (
-                <tr key={i.id}>
-                  <td>{i.to ? <Link to={i.to}>{i.type}</Link> : i.type}</td>
-                  <td>{i.title}</td>
-                  <td>{i.sub}</td>
-                  <td>{i.badge && <span className="badge" data-tone={i.tone}>{i.badge}</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </section>
   );
 }

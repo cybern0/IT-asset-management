@@ -1,14 +1,18 @@
-// Circuit > Traçabilité des matériels : choisir un matériel, lire son parcours (acquisition, demandes, signatures,
-// remises, retours, modifications). Le parcours est reconstitué par l'API (GET /tracabilite) : rien n'est saisi ici.
+// Global > Matériel : tout le matériel (recherche, filtres) et, pour celui qui est choisi, son parcours (acquisition,
+// demandes, signatures, remises, retours, modifications). Le parcours est reconstitué par l'API (GET /tracabilite) :
+// rien n'est saisi ici. Le matériel choisi est dans l'adresse (?materiel=ID) : on peut y renvoyer depuis ailleurs.
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import { api, ApiError } from "../lib/api";
 import { fmtDate } from "../lib/detention";
 import { Icon } from "../lib/icons";
 import { useI18n } from "../lib/i18n";
+import { useMenu } from "../lib/menu";
 import { tone } from "../lib/schema";
 
 type Row = {
-  id: number; code_inventaire: string; designation: string; categorie: string; statut: string; etat: string;
+  id: number; code_inventaire: string; designation: string; categorie: string; categorie_code: string; statut: string; etat: string;
+  marque: string | null; modele: string | null; numero_serie: string | null; localisation: string | null;
   detenteur: string | null; service: string | null; depuis: string | null; nb_detenteurs: number; dernier_mouvement: string | null;
 };
 type Ev = {
@@ -45,7 +49,13 @@ export function TracabiliteView() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [statut, setStatut] = useState("");
-  const [selected, setSelected] = useState<number | null>(null);
+  const [categorie, setCategorie] = useState("");
+  const [detention, setDetention] = useState("");
+  const { tabOf } = useMenu();
+  const [params, setParams] = useSearchParams();
+  const asked = Number(params.get("materiel"));
+  const selected: number | null = Number.isInteger(asked) && asked > 0 ? asked : null;
+  const setSelected = (id: number | null) => setParams(id === null ? {} : { materiel: String(id) }, { replace: true });
   const [parcours, setParcours] = useState<Parcours | null>(null);
   const [loadingP, setLoadingP] = useState(false);
   const [errorP, setErrorP] = useState("");
@@ -77,10 +87,16 @@ export function TracabiliteView() {
     const q = norm(query.trim());
     return rows.filter((r) => {
       if (statut && r.statut !== statut) return false;
+      if (categorie && r.categorie !== categorie) return false;
+      if (detention === "DETENU" && !r.detenteur) return false;
+      if (detention === "LIBRE" && r.detenteur) return false;
       if (!q) return true;
-      return norm(`${r.code_inventaire} ${r.designation} ${r.categorie} ${r.detenteur ?? ""} ${r.service ?? ""}`).includes(q);
+      return norm(`${r.code_inventaire} ${r.designation} ${r.categorie} ${r.marque ?? ""} ${r.modele ?? ""} ${r.numero_serie ?? ""} ${r.localisation ?? ""} ${r.detenteur ?? ""} ${r.service ?? ""}`).includes(q);
     });
-  }, [rows, query, statut]);
+  }, [rows, query, statut, categorie, detention]);
+  const categories = useMemo(() => Array.from(new Set(rows.map((r) => r.categorie))).sort((a, b) => a.localeCompare(b)), [rows]);
+  const current = rows.find((r) => r.id === selected);
+  const fiche = current ? tabOf(current.categorie_code) : null; // onglet Assets qui affiche la categorie du materiel
 
   return (
     <div className="crud">
@@ -91,12 +107,21 @@ export function TracabiliteView() {
         <label className="search">
           <Icon name="search" size={16} />
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("Code, désignation, détenteur…")} aria-label={t("Filtrer la liste")} />
+            placeholder={t("Code, désignation, série, détenteur…")} aria-label={t("Filtrer la liste")} />
         </label>
         <div className="filters tight">
           <select value={statut} onChange={(e) => setStatut(e.target.value)} aria-label={t("Statut")}>
             <option value="">{t("Tous les statuts")}</option>
             {Object.entries(STATUT).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
+          </select>
+          <select value={categorie} onChange={(e) => setCategorie(e.target.value)} aria-label={t("Catégorie")}>
+            <option value="">{t("Toutes les catégories")}</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={detention} onChange={(e) => setDetention(e.target.value)} aria-label={t("Détention")}>
+            <option value="">{t("Détenus et libres")}</option>
+            <option value="DETENU">{t("Détenus")}</option>
+            <option value="LIBRE">{t("Libres")}</option>
           </select>
           <button type="button" className="btn ghost" onClick={() => void load()} disabled={loading}>{t("Actualiser")}</button>
         </div>
@@ -137,6 +162,7 @@ export function TracabiliteView() {
             <div className="pane-head">
               <h2>{parcours ? parcours.materiel.code_inventaire : t("Parcours")}</h2>
               <span className="head-actions">
+                {fiche && <Link className="btn ghost" to={`/assets/${fiche.groupSlug}/${fiche.key}`}>{t("Ouvrir la fiche")}</Link>}
                 <button type="button" className="btn ghost" onClick={() => setSelected(null)}>{t("Fermer")}</button>
               </span>
             </div>

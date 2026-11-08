@@ -7,6 +7,7 @@ export default [
     index("routes/home.tsx"),
     route("dashboard", "routes/dashboard.tsx"),
     route("dashboard/repartition", "routes/repartition.tsx"),
+    route("global/:tab?", "routes/global.tsx"),
     route("profil", "routes/profile.tsx"),
     route("assets/:group/:tab?", "routes/module.tsx", { id: "assets" }),
     route("circuit/:group/:tab?", "routes/module.tsx", { id: "circuit" }),

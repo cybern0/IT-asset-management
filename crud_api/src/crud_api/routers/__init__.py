@@ -61,5 +61,5 @@ for prefix, tag, service, create, update, out, immutable in _resources:
 api_router.include_router(fiches.router, dependencies=[_assets])
 api_router.include_router(circuit.router)  # circuit de demande : droits verifies route par route
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Tableau de bord"])  # droits par route
-api_router.include_router(tracabilite.router, prefix="/tracabilite", tags=["Traçabilité"], dependencies=[Depends(requires("dashboard.repartition"))])  # parcours des materiels (lecture seule)
+api_router.include_router(tracabilite.router, prefix="/tracabilite", tags=["Traçabilité"], dependencies=[_assets])  # vue Global > Materiel : parcours des materiels (lecture seule, meme droit que le parc : parc.lire)
 api_router.include_router(audit.router, prefix="/journal-audit", tags=["Journal d'audit"], dependencies=[Depends(require_perms(read=_p("audit.lire"), write=_p("audit.lire")))])
