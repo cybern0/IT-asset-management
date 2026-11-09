@@ -3,6 +3,8 @@
 -- A executer apres eparc_01_schema.sql et eparc_02_donnees_initiales.sql (categories requises).
 -- Rejouable pour l'essentiel (ON CONFLICT / NOT EXISTS). Les noms, matricules et numeros sont inventes.
 --
+-- Section 8 : parcours de tracabilite (transferts, retours, dossier annule), visibles dans Global > Materiel.
+--
 -- Non inclus : utilisateur et mouvement_consommable (ce dernier exige un utilisateur : effectue_par).
 -- Sans trigger, les colonnes agent_matricule / agent_nom sont renseignees ici explicitement.
 -- =====================================================================================================================
@@ -268,3 +270,83 @@ FROM (VALUES
 ) AS v(nom, version, cle, postes, expiration, obs)
 JOIN logiciel l ON l.nom = v.nom AND l.version = v.version
 WHERE NOT EXISTS (SELECT 1 FROM licence x WHERE x.logiciel_id = l.id AND x.cle_licence = v.cle);
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 8. Tracabilite : parcours complets de materiels (detenteurs successifs, transferts, retours, dossier annule)
+--    A voir dans l'interface : Global > Materiel > choisir le materiel.
+--      INV-PC-008 : M005 -> (transfert) M007 -> (transfert) M006 = detenteur actuel   [3 affectations, 2 transferts]
+--      INV-PC-009 : M008 puis rendu en panne, en maintenance                          [retour avec etat EN_PANNE]
+--      INV-PC-010 : M004 puis rendu, de nouveau en stock                              [+ dossier de demande annule]
+-- ---------------------------------------------------------------------------------------------------------------------
+INSERT INTO materiel(code_inventaire, categorie_id, designation, marque, modele, numero_serie, caracteristiques,
+                     provenance, provenance_detail, date_acquisition, valeur_acquisition, etat, statut, localisation)
+SELECT v.code, c.id, v.designation, v.marque, v.modele, v.serie, v.caract,
+       v.provenance, v.prov_detail, v.date_acq::date, v.valeur::numeric, v.etat, v.statut, v.localisation
+FROM (VALUES
+ ('INV-PC-008', 'ORDINATEUR', 'Ordinateur portable', 'Lenovo', 'ThinkPad T14', 'SN-DEMO-PC-008',
+    'RAM: 16 Go, Stockage: 512 Go SSD, OS: Windows 11 Pro, CPU: Intel i5-1135G7',
+    'ACHAT', 'BL-2023-021', '2023-03-10', '3000000', 'BON', 'ATTRIBUE', 'Siège - Réseaux'),
+ ('INV-PC-009', 'ORDINATEUR', 'Ordinateur portable', 'Dell', 'Latitude 7420', 'SN-DEMO-PC-009',
+    'RAM: 16 Go, Stockage: 256 Go SSD, OS: Windows 10 Pro, CPU: Intel i5-1145G7',
+    'ACHAT', 'BL-2022-088', '2022-11-15', '3300000', 'EN_PANNE', 'EN_MAINTENANCE', 'Atelier DSI'),
+ ('INV-PC-010', 'ORDINATEUR', 'Ordinateur portable', 'HP', 'ProBook 440 G9', 'SN-DEMO-PC-010',
+    'RAM: 8 Go, Stockage: 256 Go SSD, OS: Windows 11 Pro, CPU: Intel i5-1235U',
+    'DOTATION', 'Dotation ministère', '2023-12-18', '2500000', 'BON', 'EN_STOCK', 'Magasin informatique')
+) AS v(code, cat_code, designation, marque, modele, serie, caract, provenance, prov_detail,
+       date_acq, valeur, etat, statut, localisation)
+JOIN categorie_materiel c ON c.code = v.cat_code
+ON CONFLICT (code_inventaire) DO NOTHING;
+
+-- Affectations : chaque ligne = un detenteur (date_retour NULL = detenteur actuel)
+INSERT INTO affectation(materiel_id, agent_id, agent_matricule, agent_nom, date_remise, date_retour,
+                        etat_remise, etat_retour, observations)
+SELECT m.id, a.id, a.matricule, a.prenom || ' ' || a.nom,
+       v.date_remise::date, v.date_retour::date, v.etat_remise, v.etat_retour, v.obs
+FROM (VALUES
+ ('INV-PC-008', 'M005', '2023-04-03', '2024-05-20', 'NEUF', 'BON',      'Restitué : le poste est réaffecté à la comptabilité'),
+ ('INV-PC-008', 'M007', '2024-05-20', '2025-09-10', 'BON',  'BON',      'Transfert depuis le secrétariat, retiré pour réaffectation'),
+ ('INV-PC-008', 'M006', '2025-09-10', NULL,         'BON',  NULL,       'Poste repris de la comptabilité pour l''équipe réseau'),
+ ('INV-PC-009', 'M008', '2023-01-09', '2026-03-12', 'NEUF', 'EN_PANNE', 'Rendu en panne : carte mère défectueuse, envoyé en maintenance'),
+ ('INV-PC-010', 'M004', '2024-01-15', '2025-11-30', 'NEUF', 'BON',      'Remplacé par un poste de bureau')
+) AS v(code_inv, matricule, date_remise, date_retour, etat_remise, etat_retour, obs)
+JOIN materiel m ON m.code_inventaire = v.code_inv
+JOIN agent a ON a.matricule = v.matricule
+WHERE NOT EXISTS (SELECT 1 FROM affectation x WHERE x.materiel_id = m.id AND x.date_remise = v.date_remise::date);
+
+-- Dossiers (fiches de detention) : attributions et transferts. Un transfert (type AFFECTATION) garde l'ancien
+-- detenteur et l'ancienne affectation, ce qui alimente la vue v_transferts et « Repris de ... » dans la timeline.
+INSERT INTO fiche_detention (reference, type_demande, affectation_id, agent_id, agent_matricule, agent_nom, categorie_id, materiel_id,
+        besoin, canal, demandeur, date_demande, valide_par, date_validation, approuve_le, date_generation,
+        statut, date_signature, mode_signature, signe_par, signature_agent_le, signature_chef_le,
+        date_remise, etat_constate, reception_approuvee_le, ancien_agent_id, ancienne_affectation_id)
+SELECT v.reference, v.type_demande, a.id, a.agent_id, a.agent_matricule, a.agent_nom, mat.categorie_id, mat.id,
+       v.besoin, 'FORMULAIRE', a.agent_nom, a.date_remise - 7, 'Marie Rasoa', a.date_remise - 5,
+       (a.date_remise - 5)::timestamptz, a.date_remise - 3,
+       'SIGNEE', a.date_remise, 'MANUSCRITE', 'Chef de service',
+       a.date_remise::timestamptz, a.date_remise::timestamptz,
+       a.date_remise, CASE WHEN a.etat_remise IN ('NEUF','BON','A_REPARER') THEN a.etat_remise END,
+       a.date_remise::timestamptz, prev.agent_id, prev.id
+FROM (VALUES
+ ('FD-2023-0101', 'ATTRIBUTION', 'INV-PC-008', '2023-04-03', NULL,         'Poste portable pour le secrétariat de direction'),
+ ('FD-2024-0102', 'AFFECTATION', 'INV-PC-008', '2024-05-20', '2023-04-03', 'Affectation directe : matériel retiré à Lalaina Razafy'),
+ ('FD-2025-0101', 'AFFECTATION', 'INV-PC-008', '2025-09-10', '2024-05-20', 'Affectation directe : matériel retiré à Fanja Rasolo'),
+ ('FD-2023-0102', 'ATTRIBUTION', 'INV-PC-009', '2023-01-09', NULL,         'Portable pour la responsable infrastructure'),
+ ('FD-2024-0101', 'ATTRIBUTION', 'INV-PC-010', '2024-01-15', NULL,         'Poste portable pour le chef de secrétariat')
+) AS v(reference, type_demande, code_inv, date_remise, prev_remise, besoin)
+JOIN materiel mat ON mat.code_inventaire = v.code_inv
+JOIN affectation a ON a.materiel_id = mat.id AND a.date_remise = v.date_remise::date
+LEFT JOIN affectation prev ON prev.materiel_id = mat.id AND prev.date_remise = v.prev_remise::date
+ON CONFLICT (reference) DO NOTHING;
+
+-- Dossier annule : INV-PC-010 avait ete reserve pour M001 (demande, approbation, puis annulation)
+INSERT INTO fiche_detention (reference, type_demande, agent_id, agent_matricule, agent_nom, categorie_id, materiel_id,
+        besoin, canal, demandeur, date_demande, valide_par, date_validation, approuve_le, date_generation,
+        cloture, motif_cloture)
+SELECT 'FD-2025-0102', 'ATTRIBUTION', a.id, a.matricule, a.prenom || ' ' || a.nom, m.categorie_id, m.id,
+       'Poste de secours pour les interventions', 'MAIL', a.prenom || ' ' || a.nom,
+       DATE '2025-12-01', 'Marie Rasoa', DATE '2025-12-05', TIMESTAMPTZ '2025-12-05 09:00+00', DATE '2025-12-05',
+       'ANNULEE', 'Agent finalement équipé d''un autre poste'
+FROM agent a, materiel m
+WHERE a.matricule = 'M001' AND m.code_inventaire = 'INV-PC-010'
+ON CONFLICT (reference) DO NOTHING;
