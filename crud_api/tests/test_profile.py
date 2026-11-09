@@ -42,14 +42,12 @@ async def test_wrong_current_password_is_422_not_401(user):
     assert e.value.status_code == 422 and e.value.field == "mot_de_passe_actuel" and user.nom_utilisateur == "rakoto"
 
 
-async def test_change_username_and_password_is_audited_without_secret(user):
+async def test_change_username_and_password(user):
     db = FakeDB()
     out = await user_service.update_profile(
         db, user, ProfileUpdate(mot_de_passe_actuel="ancien-mdp-1", nom_utilisateur="  jean  ", nouveau_mot_de_passe="nouveau-mdp-2"))
     assert out.nom_utilisateur == "jean" and verify_password("nouveau-mdp-2", user.mot_de_passe_hash)
-    assert db.commits == 1 and db.added[0].action == "UPDATE_PROFIL"
-    assert db.added[0].details == {"champs": ["nom_utilisateur", "mot_de_passe"]}
-    assert "nouveau-mdp-2" not in str(db.added[0].details)
+    assert db.commits == 1
 
 
 async def test_nothing_to_change_and_same_password_rejected(user):

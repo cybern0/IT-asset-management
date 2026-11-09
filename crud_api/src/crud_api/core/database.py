@@ -1,8 +1,6 @@
 # Session SQLAlchemy, connexion Postgres
 from collections.abc import AsyncIterator
-import ipaddress
 
-from fastapi import Request
 from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -21,12 +19,7 @@ engine = create_async_engine(settings.database_url, echo=settings.db_echo, pool_
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
-    """Une session par requete. `session.info` transporte le contexte d'audit (IP, utilisateur)."""
+async def get_db() -> AsyncIterator[AsyncSession]:
+    """Une session par requete. `session.info["actor_id"]` memorise l'utilisateur connecte (voir core/deps.py)."""
     async with SessionLocal() as session:
-        host = request.client.host if request.client else None
-        try:
-            session.info["ip"] = str(ipaddress.ip_address(host)) if host else None
-        except ValueError:
-            session.info["ip"] = None
         yield session

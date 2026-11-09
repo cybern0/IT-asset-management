@@ -66,7 +66,7 @@ async def test_single_admin_role(client):
     assert r.status_code == 200 and me["role_code"] == "ADMIN" and me["role_id"] == u["role_id"]
     assert {"fiche.signer_agent", "fiche.signer_chef", "reception.approuver", "demande.creer", "demande.voir_toutes",
             "demande.approuver", "fiche.remettre", "parc.lire", "parc.ecrire", "affectation.transferer", "acces.gerer",
-            "audit.lire", "dashboard.voir"} <= set(me["permissions"])
+            "dashboard.voir"} <= set(me["permissions"])
     # aucun autre role n'est accepte
     r = await client.post("/utilisateurs", json={"nom_utilisateur": "a2", "mot_de_passe": "secret-123", "role_code": "UTILISATEUR"})
     assert r.status_code == 422
@@ -203,24 +203,6 @@ async def test_software_and_licences(client):
     assert r.status_code == 409 and r.json()["field"] == "type_licence"
 
 
-async def test_audit_log_is_written_and_read_only(client):
-    d = await post(client, "/directions", {"code": "DG", "nom": "DG"})
-    await client.patch(f"/directions/{d['id']}", json={"nom": "DG2"})
-    await client.delete(f"/directions/{d['id']}")
-    entries = (await client.get("/journal-audit")).json()
-    actions = [(e["action"], e["table_cible"], e["identifiant_cible"]) for e in entries]
-    assert ("CREATE", "direction", d["id"]) in actions
-    assert ("UPDATE", "direction", d["id"]) in actions
-    assert ("DELETE", "direction", d["id"]) in actions
-    created = next(e for e in entries if e["action"] == "CREATE")
-    assert created["details"] == {"champs": ["code", "nom"]}
-    assert (await client.post("/journal-audit", json={"action": "X"})).status_code == 405
-    assert (await client.delete(f"/journal-audit/{entries[0]['id']}")).status_code in (404, 405)
-    # un secret n'est jamais journalise
-    await post(client, "/utilisateurs", {"nom_utilisateur": "u", "mot_de_passe": "secret-123", "role_code": "ADMIN"})
-    assert "secret-123" not in (await client.get("/journal-audit")).text
-
-
 async def test_authentication_when_enabled(client, monkeypatch):
     await post(client, "/utilisateurs", {"nom_utilisateur": "admin", "mot_de_passe": "secret-123", "role_code": "ADMIN"})
     settings = get_settings()
@@ -235,10 +217,6 @@ async def test_authentication_when_enabled(client, monkeypatch):
     assert (await client.get("/materiels", headers=auth)).status_code == 200
     assert (await client.get("/auth/me", headers=auth)).json()["nom_utilisateur"] == "admin"
     assert (await client.get("/materiels", headers={"Authorization": "Bearer faux"})).status_code == 401
-    # l'auteur est journalise
-    await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=auth)
-    entries = (await client.get("/journal-audit", headers=auth)).json()
-    assert any(e["action"] == "CREATE" and e["utilisateur_id"] is not None for e in entries)
 
 
 async def test_authorization_admin_only(client, monkeypatch):
@@ -249,14 +227,14 @@ async def test_authorization_admin_only(client, monkeypatch):
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "jwt_secret", "x" * 40)
 
-    for url in ("/materiels", "/agents", "/utilisateurs", "/journal-audit", "/dashboard", "/dashboard/repartition"):
+    for url in ("/materiels", "/agents", "/utilisateurs", "/dashboard", "/dashboard/repartition"):
         assert (await client.get(url)).status_code == 401, url
 
     r = await client.post("/auth/login", json={"nom_utilisateur": "adm", "mot_de_passe": "secret-123", "role_code": "ADMIN"})
     assert r.status_code == 200 and r.json()["user"]["role_code"] == "ADMIN"
     adm = {"Authorization": f"Bearer {r.json()['access_token']}"}
     assert (await client.get("/auth/me", headers=adm)).json()["role_code"] == "ADMIN"
-    for url in ("/materiels", "/agents", "/utilisateurs", "/journal-audit", "/dashboard", "/dashboard/repartition"):
+    for url in ("/materiels", "/agents", "/utilisateurs", "/dashboard", "/dashboard/repartition"):
         assert (await client.get(url, headers=adm)).status_code == 200, url
     assert (await client.post("/directions", json={"code": "DG", "nom": "DG"}, headers=adm)).status_code == 201
     assert (await client.patch(f"/materiels/{m['id']}", json={"designation": "PC 2"}, headers=adm)).status_code == 200

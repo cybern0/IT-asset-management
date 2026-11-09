@@ -24,7 +24,7 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> Utilisateur | None:
     """Si AUTH_ENABLED=false (defaut), l'API est ouverte et renvoie None.
-    Sinon exige un jeton Bearer valide et memorise l'auteur pour le journal d'audit."""
+    Sinon exige un jeton Bearer valide et memorise l'auteur (db.info["actor_id"])."""
     if not get_settings().auth_enabled:
         return None
     if credentials is None:

@@ -12,7 +12,7 @@ from crud_api.core.database import Base
 from crud_api.core.errors import ConflictError, UnprocessableError
 from crud_api.models.user import role_permission
 from crud_api.schemas.fiche import AttributionCreate, AvancerIn
-from crud_api.services import audit_service, fiche_service as fs
+from crud_api.services import fiche_service as fs
 
 pytestmark = pytest.mark.nodb
 
@@ -24,10 +24,6 @@ def _bigint_as_integer(type_, compiler, **kw):  # cle auto-incrementee sous SQLi
 
 @pytest_asyncio.fixture
 async def db(monkeypatch):
-    async def no_audit(*a, **k):  # le journal utilise des types PostgreSQL (JSONB, INET)
-        return None
-
-    monkeypatch.setattr(audit_service, "record", no_audit)
     engine = create_async_engine("sqlite+aiosqlite:///:memory:").execution_options(schema_translate_map={"eparc": None})
     tables = [m.__table__ for m in (
         M.Permission, M.Role, M.Utilisateur, M.CategorieMateriel, M.Direction, M.Service, M.Agent, M.Materiel,

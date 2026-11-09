@@ -9,7 +9,7 @@ from crud_api.core.deps import require_admin
 from crud_api.core.errors import ConflictError, NotFoundError
 from crud_api.schemas.fiche import AttributionCreate, AttributionDirecteIn, AttributionOut, AvancerIn, MotifIn, SignatureIn
 from crud_api.schemas.materiel import MaterielOut
-from crud_api.services import audit_service, fiche_pdf, fiche_service, file_store
+from crud_api.services import fiche_pdf, fiche_service, file_store
 from crud_api.services.materiel_service import materiel_service
 
 router = APIRouter()
@@ -102,7 +102,6 @@ async def put_image(materiel_id: int, file: UploadFile = File(...), db: AsyncSes
     m.image_chemin = await file_store.save(
         file, "materiels", str(m.id), file_store.IMAGE_TYPES, get_settings().max_image_mb
     )
-    await audit_service.record(db, "IMAGE_SET", "materiel", m.id, None)
     await db.commit()
     file_store.remove(old)
     return await materiel_service.get(db, materiel_id)
@@ -113,7 +112,6 @@ async def delete_image(materiel_id: int, db: AsyncSession = Depends(get_db)):
     m = await materiel_service.get(db, materiel_id)
     old = m.image_chemin
     m.image_chemin = None
-    await audit_service.record(db, "IMAGE_DELETE", "materiel", m.id, None)
     await db.commit()
     file_store.remove(old)
     return Response(status_code=204)

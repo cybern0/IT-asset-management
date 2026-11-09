@@ -370,25 +370,7 @@ CREATE INDEX IF NOT EXISTS idx_licence_expiration ON licence(date_expiration);
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 8. Journal d'audit
--- ---------------------------------------------------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS journal_audit (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    utilisateur_id BIGINT REFERENCES utilisateur(id),
-    action VARCHAR(80) NOT NULL,
-    table_cible VARCHAR(100),
-    identifiant_cible BIGINT,
-    details JSONB,
-    adresse_ip INET,
-    cree_le TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_date ON journal_audit(cree_le DESC);
-
-
--- ---------------------------------------------------------------------------------------------------------------------
--- 9. Index de consultation
+-- 8. Index de consultation
 -- ---------------------------------------------------------------------------------------------------------------------
 
 CREATE INDEX IF NOT EXISTS idx_materiel_statut ON materiel(statut);
@@ -400,7 +382,7 @@ CREATE INDEX IF NOT EXISTS idx_mouvement_article_date ON mouvement_consommable(a
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 10. Vues
+-- 9. Vues
 -- ---------------------------------------------------------------------------------------------------------------------
 
 -- Phase du dossier, deduite des donnees (jamais stockee, donc jamais desynchronisee).

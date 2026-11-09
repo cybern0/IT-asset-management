@@ -1,4 +1,4 @@
-"""Tracabilite des materiels : le parcours est reconstitue a partir du circuit, des affectations et du journal."""
+"""Tracabilite des materiels : le parcours est reconstitue a partir du circuit et des affectations."""
 from tests.test_api import make_agent, make_materiel, post
 
 
@@ -42,13 +42,10 @@ async def test_direct_assignment_and_unknown_material(client):
     agent = await make_agent(client, "TR3")
     m = await make_materiel(client, "ORD-TD")
     await post(client, "/affectations", {"materiel_id": m["id"], "agent_id": agent["id"], "etat_remise": "NEUF"})
-    await client.patch(f"/materiels/{m['id']}", json={"localisation": "Bureau 2"})
     p = (await client.get(f"/tracabilite/{m['id']}")).json()
     types = [e["type"] for e in p["evenements"]]
     # une affectation directe cree un dossier de regularisation : elle apparait comme une remise, sans doublon
-    assert "REMISE" in types and "AFFECTATION_DIRECTE" not in types and "MODIFICATION" in types
-    modif = next(e for e in p["evenements"] if e["type"] == "MODIFICATION")
-    assert "localisation" in modif["champs"]
+    assert "REMISE" in types and "AFFECTATION_DIRECTE" not in types
     row = next(r for r in (await client.get("/tracabilite")).json() if r["id"] == m["id"])
     assert row["detenteur"] == "Jean Rakoto" and row["nb_detenteurs"] == 1
     assert (await client.get("/tracabilite/999999")).status_code == 404

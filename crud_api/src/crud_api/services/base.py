@@ -1,4 +1,4 @@
-# Socle commun des services : CRUD generique, audit, traduction des erreurs PostgreSQL
+# Socle commun des services : CRUD generique, traduction des erreurs PostgreSQL
 from __future__ import annotations
 
 import re
@@ -11,12 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.core.database import Base
 from crud_api.core.errors import ConflictError, NotFoundError, UnprocessableError
-from crud_api.services import audit_service
 
 ModelT = TypeVar("ModelT", bound=Base)
-
-_SECRET = "mot_de_passe"
-
 
 def translate_integrity_error(exc: IntegrityError, operation: str) -> Exception:
     """Convertit une erreur de contrainte PostgreSQL en erreur metier lisible."""
@@ -89,7 +85,6 @@ class CRUDService(Generic[ModelT]):
         db.add(obj)
         await self._flush(db, "insert")
         await self.after_create(db, obj)
-        await self._audit(db, "CREATE", obj, sorted(data.model_fields_set))
         await db.commit()
         return await self.get(db, obj.id)  # type: ignore[attr-defined]
 
@@ -101,7 +96,6 @@ class CRUDService(Generic[ModelT]):
         for key, value in values.items():
             setattr(obj, key, value)
         await self._flush(db, "update")
-        await self._audit(db, "UPDATE", obj, sorted(data.model_fields_set))
         await db.commit()
         return await self.get(db, item_id)
 
@@ -110,7 +104,6 @@ class CRUDService(Generic[ModelT]):
         await self.before_delete(db, obj)
         await db.delete(obj)
         await self._flush(db, "delete")
-        await self._audit(db, "DELETE", obj, None)
         await db.commit()
 
     # ----- utilitaires -------------------------------------------------------
@@ -126,9 +119,3 @@ class CRUDService(Generic[ModelT]):
         except IntegrityError as exc:
             await db.rollback()
             raise translate_integrity_error(exc, operation) from exc
-
-    async def _audit(self, db: AsyncSession, action: str, obj: ModelT, fields: list[str] | None) -> None:
-        details = {"champs": [f for f in fields if _SECRET not in f]} if fields is not None else None
-        await audit_service.record(
-            db, action, self.model.__tablename__, obj.id, details  # type: ignore[attr-defined]
-        )

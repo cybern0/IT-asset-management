@@ -3,7 +3,7 @@
 -- A executer apres eparc_01_schema.sql et eparc_02_donnees_initiales.sql (categories requises).
 -- Rejouable pour l'essentiel (ON CONFLICT / NOT EXISTS). Les noms, matricules et numeros sont inventes.
 --
--- Non inclus : utilisateur, journal_audit et mouvement_consommable (ce dernier exige un utilisateur : effectue_par).
+-- Non inclus : utilisateur et mouvement_consommable (ce dernier exige un utilisateur : effectue_par).
 -- Sans trigger, les colonnes agent_matricule / agent_nom sont renseignees ici explicitement.
 -- =====================================================================================================================
 

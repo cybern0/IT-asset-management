@@ -1,5 +1,5 @@
 # Tracabilite des materiels : liste resumee, puis parcours chronologique d'un materiel
-# (acquisition, demandes, approbation, signatures, remises, retours, receptions, modifications).
+# (acquisition, demandes, approbation, signatures, remises, retours, receptions).
 # Tout est reconstitue a partir des tables existantes : rien n'est stocke en plus.
 from datetime import date, datetime
 from typing import Any
@@ -9,14 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud_api.core.errors import NotFoundError
 from crud_api.models import (
-    Affectation, Agent, FicheDetention, JournalAudit, Materiel, Service, Utilisateur,
+    Affectation, Agent, FicheDetention, Materiel, Service, Utilisateur,
 )
 
 # Ordre des evenements d'une MEME journee (un retour precede la remise suivante : transfert)
 _RANK = {
     "ACQUISITION": 0, "ENREGISTREMENT": 1, "DEMANDE": 2, "APPROBATION": 3, "SIGNATURE_AGENT": 4, "SIGNATURE_CHEF": 4,
     "SIGNATURE": 4, "RETOUR": 5, "REMISE": 6, "AFFECTATION_DIRECTE": 6, "RECEPTION": 7, "REFUS": 8, "ANNULATION": 8,
-    "MODIFICATION": 9,
 }
 
 
@@ -71,14 +70,11 @@ async def detail(db: AsyncSession, materiel_id: int) -> dict[str, Any]:
         raise NotFoundError("Matériel introuvable.")
     affs = list((await db.scalars(select(Affectation).where(Affectation.materiel_id == m.id))).all())
     fiches = list((await db.scalars(select(FicheDetention).where(FicheDetention.materiel_id == m.id))).all())
-    audits = list((await db.scalars(
-        select(JournalAudit).where(JournalAudit.table_cible == "materiel", JournalAudit.identifiant_cible == m.id)
-    )).all())
 
     agent_ids = {x for a in affs for x in (a.agent_id,)} | {x for f in fiches for x in (f.agent_id, f.ancien_agent_id)}
     agents = {a.id: a for a in (await db.scalars(select(Agent).where(Agent.id.in_(agent_ids - {None})))).all()} if agent_ids - {None} else {}
     user_ids = {u for f in fiches for u in (f.demande_par, f.approuve_par, f.signature_agent_par, f.signature_chef_par, f.reception_approuvee_par)}
-    user_ids |= {a.cree_par for a in affs} | {e.utilisateur_id for e in audits}
+    user_ids |= {a.cree_par for a in affs}
     user_ids -= {None}
     users = {u.id: u.nom_utilisateur for u in (await db.scalars(select(Utilisateur).where(Utilisateur.id.in_(user_ids)))).all()} if user_ids else {}
     who = lambda uid: users.get(uid) if uid else None  # noqa: E731
@@ -94,8 +90,7 @@ async def detail(db: AsyncSession, materiel_id: int) -> dict[str, Any]:
 
     if m.date_acquisition:
         add("ACQUISITION", m.date_acquisition, provenance=m.provenance, detail=m.provenance_detail)
-    created_by = next((e.utilisateur_id for e in audits if e.action == "CREATE"), None)
-    add("ENREGISTREMENT", m.cree_le, par=who(created_by))
+    add("ENREGISTREMENT", m.cree_le)
 
     for f in fiches:
         agent = _agent_name(agents.get(f.agent_id), f.agent_nom)
@@ -127,10 +122,6 @@ async def detail(db: AsyncSession, materiel_id: int) -> dict[str, Any]:
         if a.id not in linked:  # sans dossier : affectation directe
             add("AFFECTATION_DIRECTE", a.date_remise, agent=agent, etat=a.etat_remise, par=who(a.cree_par), observations=a.observations)
         add("RETOUR", a.date_retour, agent=agent, etat=a.etat_retour, observations=a.observations)
-
-    for e in audits:
-        if e.action == "UPDATE":
-            add("MODIFICATION", e.cree_le, par=who(e.utilisateur_id), champs=(e.details or {}).get("champs"))
 
     ev.sort(key=lambda e: (e["date"], _RANK.get(e["type"], 9)))
     current = next((a for a in affs if a.date_retour is None), None)

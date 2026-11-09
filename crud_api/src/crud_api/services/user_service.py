@@ -10,7 +10,6 @@ from crud_api.core.errors import ConflictError, UnauthorizedError, Unprocessable
 from crud_api.core.security import hash_password, verify_password
 from crud_api.models import Role, Utilisateur
 from crud_api.schemas.user import ProfileUpdate, UserCreate
-from crud_api.services import audit_service
 from crud_api.services.base import CRUDService
 
 logger = logging.getLogger(__name__)
@@ -76,7 +75,6 @@ class UserService(CRUDService[Utilisateur]):
             raise UnauthorizedError("Identifiants invalides.")
         user.derniere_connexion = datetime.now(UTC)
         db.info["actor_id"] = user.id
-        await audit_service.record(db, "LOGIN", "utilisateur", user.id)
         await db.commit()
         return user
 
@@ -96,11 +94,10 @@ class UserService(CRUDService[Utilisateur]):
                     "Le nouveau mot de passe doit être différent de l’actuel.", field="nouveau_mot_de_passe"
                 )
             user.mot_de_passe_hash = hash_password(data.nouveau_mot_de_passe)
-            changed.append("mot_de_passe")  # seul le nom du champ est journalise, jamais sa valeur
+            changed.append("mot_de_passe")
         if not changed:
             raise UnprocessableError("Aucune modification à enregistrer.")
         await self._flush(db, "update")  # nom deja pris -> 409 « Cette valeur existe déjà. »
-        await audit_service.record(db, "UPDATE_PROFIL", "utilisateur", user.id, {"champs": changed})
         await db.commit()
         return await self.get(db, user.id)
 

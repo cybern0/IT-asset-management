@@ -101,8 +101,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
     };
     const refresh = (table: string) => {
-      // effets de bord cote serveur + nouvelle ligne du journal d'audit
-      void loadTables([...(refreshAfter[table] ?? []), "journal_audit"]);
+      // effets de bord cote serveur
+      void loadTables(refreshAfter[table] ?? []);
     };
 
     return {

@@ -66,7 +66,7 @@ async def test_standard_user_circuit(client, monkeypatch):
 async def test_standard_user_has_no_access_to_the_rest(client, monkeypatch):
     _, _, _, _, login = await _setup(client, monkeypatch)
     ag = await login("agent")
-    for url in ("/materiels", "/agents", "/services", "/affectations", "/attributions", "/utilisateurs", "/journal-audit",
+    for url in ("/materiels", "/agents", "/services", "/affectations", "/attributions", "/utilisateurs",
                 "/dashboard", "/dashboard/repartition", "/tracabilite"):
         assert (await client.get(url, headers=ag)).status_code == 403, url
     opts = (await client.get("/demandes/options", headers=ag)).json()

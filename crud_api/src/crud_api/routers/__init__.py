@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from crud_api.core.deps import get_current_user, require_perms
-from crud_api.routers import audit, auth, circuit, dashboard, fiches, tracabilite
+from crud_api.routers import auth, circuit, dashboard, fiches, tracabilite
 from crud_api.routers.crud import crud_router
 from crud_api.schemas import consommable as c
 from crud_api.schemas import logiciel as lg
@@ -62,4 +62,3 @@ api_router.include_router(fiches.router, dependencies=[_assets])
 api_router.include_router(circuit.router)  # transfert et options : droits verifies route par route
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Tableau de bord"])  # droits par route
 api_router.include_router(tracabilite.router, prefix="/tracabilite", tags=["Traçabilité"], dependencies=[_assets])  # vue Global > Materiel : parcours des materiels (lecture seule, meme droit que le parc : parc.lire)
-api_router.include_router(audit.router, prefix="/journal-audit", tags=["Journal d'audit"], dependencies=[Depends(require_perms(read=_p("audit.lire"), write=_p("audit.lire")))])

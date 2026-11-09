@@ -132,7 +132,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                       </p>
                     )}
                     {st === "current" && writable && <HandOverForm busy={busy} d={d} onSubmit={(body) =>
-                      advance(body, () => refresh(["materiel", "affectation", "journal_audit"]))} />}
+                      advance(body, () => refresh(["materiel", "affectation"]))} />}
                   </>
                 )}
 
@@ -149,7 +149,7 @@ export function AttributionSteps({ d, onChange }: { d: Attribution; onChange: (f
                           date_retour: v.date, etat_retour: v.etat || null, ...(v.observations ? { observations: v.observations } : {}),
                         });
                         return api.get<Attribution>(`/attributions/${d.id}`);
-                      }, () => refresh(["materiel", "affectation", "journal_audit"]))} />
+                      }, () => refresh(["materiel", "affectation"]))} />
                     )}
                   </>
                 )}

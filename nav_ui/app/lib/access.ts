@@ -30,9 +30,7 @@ const ADMIN_ONLY_TABLES = new Set(["utilisateur"]);
 export const isRoleCode = (v: unknown): v is RoleCode => v === "ADMIN";
 
 export const canReadTable = (permissions: readonly string[], table: string): boolean =>
-  table === "journal_audit" ? permissions.includes("audit.lire")
-    : ADMIN_ONLY_TABLES.has(table) ? permissions.includes("acces.gerer")
-    : permissions.includes("parc.lire");
+  ADMIN_ONLY_TABLES.has(table) ? permissions.includes("acces.gerer") : permissions.includes("parc.lire");
 
 /** Zone du menu correspondant a une URL (null pour /, /login...). */
 export function areaOf(pathname: string): Area | null {

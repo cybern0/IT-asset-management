@@ -27,4 +27,4 @@ L'API doit tourner (voir `../crud_api/README.md`). Si elle est injoignable, un b
 | `app/lib/dict.ts` | traductions FR / EN / MG |
 
 Rubriques sans API pour l'instant (donnees en memoire) : Rules, Forms, Notification queue, Inventory.
-Journal d'audit : lecture seule. Mouvements de stock : creation seulement.
+Mouvements de stock : creation seulement.

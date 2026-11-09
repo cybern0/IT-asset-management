@@ -65,7 +65,7 @@ export type Entity = {
   custom?: "attributions" | "affectations";
   /** Permission (code role_permission) exigee pour voir cet onglet ; sans elle, l'onglet est masque. */
   needs?: string;
-  readOnly?: boolean; // ni creation, ni modification, ni suppression (ex. journal d'audit)
+  readOnly?: boolean; // ni creation, ni modification, ni suppression
   immutable?: boolean; // creation seulement (ex. mouvements de stock)
   validate?: (
     draft: Record<string, string>,
@@ -435,33 +435,6 @@ const dictionnaires: Entity[] = [
   }),
 ];
 
-const suivi: Entity[] = [
-  ent({
-    key: "logs", label: "Logs", singular: "une entrée de journal", table: "journal_audit", readOnly: true,
-    titleFields: ["action"], subtitleFields: ["table_cible", "identifiant_cible"],
-    fields: [
-      text("action", "Action", { required: true, placeholder: "ex. AFFECTATION_CREEE" }),
-      ref("utilisateur_id", "Utilisateur", "utilisateur"),
-      text("table_cible", "Table concernée"),
-      num("identifiant_cible", "Identifiant concerné", { min: 0 }),
-      area("details", "Détails (JSON)", { placeholder: '{"cle": "valeur"}' }),
-      text("adresse_ip", "Adresse IP", { placeholder: "10.0.0.5" }),
-      created(),
-    ],
-    validate: (d) => {
-      const e: Record<string, string> = {};
-      const det = (d.details ?? "").trim();
-      if (det) { try { JSON.parse(det); } catch { e.details = "JSON invalide."; } }
-      const ip = (d.adresse_ip ?? "").trim();
-      const v4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}(\/\d{1,2})?$/;
-      const v6 = /^[0-9a-f:]*:[0-9a-f:.]*(\/\d{1,3})?$/i;
-      if (ip && !v4.test(ip) && !v6.test(ip)) e.adresse_ip = "Adresse IP invalide.";
-      return e;
-    },
-    seed: [{ action: "CONNEXION", utilisateur_id: "u1", table_cible: "utilisateur", identifiant_cible: "1", adresse_ip: "10.0.0.5", details: '{"succes": true}' }],
-  }),
-];
-
 export const sections: Section[] = [
   {
     slug: "assets",
@@ -491,7 +464,6 @@ export const sections: Section[] = [
       { slug: "organisation", label: "Organisation", icon: "network", description: "Directions, services et agents.", entities: organisation },
       { slug: "acces", label: "Accès", icon: "users", description: "Comptes utilisateurs (administrateurs).", entities: acces },
       { slug: "dictionnaires", label: "Dictionnaires", icon: "layers", description: "Listes de référence utilisées par les formulaires.", entities: dictionnaires },
-      { slug: "suivi", label: "Journal d’audit", icon: "clock", description: "Journal des actions effectuées dans l’application.", entities: suivi },
     ],
   },
 ];
@@ -591,7 +563,6 @@ export const tableEndpoint: Record<string, string> = {
   mouvement_consommable: "mouvements",
   logiciel: "logiciels",
   licence: "licences",
-  journal_audit: "journal-audit",
 };
 
 export const isRemote = (table: string): boolean => table in tableEndpoint;

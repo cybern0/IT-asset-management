@@ -201,7 +201,7 @@ export function DemandesView() {
               <div className="pane-body">
                 <DemandeSteps
                   d={current} opts={opts}
-                  onChange={(d) => { replace(d); void notify(d).catch(() => undefined); void refresh(["materiel", "affectation", "journal_audit"]); }}
+                  onChange={(d) => { replace(d); void notify(d).catch(() => undefined); void refresh(["materiel", "affectation"]); }}
                 />
               </div>
             </div>

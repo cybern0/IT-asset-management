@@ -30,7 +30,6 @@ Requete -> routers/ (main.py les assemble) -> schemas/ (validation Pydantic)
 - **Affectations** : un materiel disponible (En stock) a la fois ; le retour remet le materiel en stock, ou en maintenance / reforme selon son etat ; une affectation rendue ne se rouvre pas.
 - **Mouvements de stock** : mettent a jour `stock_consommable` (service vide = stock central), refusent un stock negatif, sont immuables.
 - **Licences** : refusees sur un logiciel « sans licence ».
-- **Journal d'audit** : ecrit automatiquement (creation, modification, suppression, connexion), lecture seule.
 
 Erreurs : `{"detail": "message", "field": "nom_du_champ"}` (409 conflit, 422 regle ou donnee refusee) ;
 les erreurs de validation Pydantic gardent le format FastAPI standard.
@@ -49,7 +48,7 @@ Droits par role (401 sans jeton valide, 403 si le role ne suffit pas) :
 | Tableau de bord, materiel, reseau, consommables, logiciels, attributions | tout | lecture, creation, modification | lecture |
 | Suppression dans ces ressources | oui | non | non |
 | Directions, services, agents | tout | lecture | lecture |
-| Utilisateurs, roles, permissions, journal d'audit | tout | aucun acces | aucun acces |
+| Utilisateurs, roles, permissions | tout | aucun acces | aucun acces |
 | Signature d'une fiche | oui | non | non |
 
 Les regles sont dans `routers/__init__.py` (`require_roles` dans `core/deps.py`) ; l'interface (`nav_ui/app/lib/access.ts`)

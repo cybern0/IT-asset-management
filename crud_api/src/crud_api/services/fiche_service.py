@@ -17,7 +17,6 @@ from crud_api.models import (
     Affectation, Agent, CategorieMateriel, Direction, FicheDetention, Materiel, Service, Utilisateur,
 )
 from crud_api.schemas.fiche import ACCESSOIRES, AttributionCreate, AttributionDirecteIn, AvancerIn, SignatureIn
-from crud_api.services import audit_service
 
 _LOCK_KEY = 7240011  # verrou applicatif : numerotation sans doublon
 REGULARISATION = "Régularisation"
@@ -181,8 +180,7 @@ async def _next_reference(db: AsyncSession) -> str:
     return f"{prefix}{(last or 0) + 1:04d}"
 
 
-async def _done(db: AsyncSession, fiche: FicheDetention, action: str, details: dict | None = None) -> dict[str, Any]:
-    await audit_service.record(db, action, "fiche_detention", fiche.id, details)
+async def _done(db: AsyncSession, fiche: FicheDetention) -> dict[str, Any]:
     await db.commit()
     return await get_detention(db, fiche.id)
 
@@ -204,7 +202,7 @@ async def create_request(db: AsyncSession, data: AttributionCreate) -> dict[str,
         fiche.date_validation = fiche.date_demande
     db.add(fiche)
     await db.flush()
-    return await _done(db, fiche, "CREATE", {"reference": fiche.reference})
+    return await _done(db, fiche)
 
 
 # ----------------------------- attribution en une saisie -----------------------------
@@ -237,7 +235,6 @@ async def create_direct(db: AsyncSession, data: AttributionDirecteIn) -> dict[st
     if data.signee:
         fiche.statut, fiche.date_signature = "SIGNEE", data.date_signature or remise
         fiche.mode_signature, fiche.signe_par = data.mode_signature or "MANUSCRITE", data.signe_par
-    await audit_service.record(db, "CREATE", "fiche_detention", fiche.id, {"reference": fiche.reference, "directe": True})
     remise_data = AvancerIn(
         etat_constate=data.etat_constate, accessoires=data.accessoires, accessoires_autre=data.accessoires_autre,
         observations=data.observations,
@@ -275,17 +272,17 @@ async def advance(db: AsyncSession, fiche_id: int, data: AvancerIn) -> dict[str,
         if not data.valide_par:
             raise UnprocessableError("Indiquez le manager qui a validé la demande.", field="valide_par")
         f.valide_par, f.date_validation = data.valide_par, on
-        return await _done(db, f, "VALIDATE", {"valide_par": data.valide_par})
+        return await _done(db, f)
 
     if step == 2:  # equipement choisi : la fiche est generee (etape 3, automatique)
         await _reserve(db, f, data.materiel_id)
         f.materiel_id, f.date_generation = data.materiel_id, date.today()
-        return await _done(db, f, "SELECT_EQUIPMENT", {"materiel_id": data.materiel_id})
+        return await _done(db, f)
 
     if step == 4:  # la fiche a ete signee (papier ou electronique)
         f.statut, f.date_signature = "SIGNEE", on
         f.mode_signature, f.signe_par = data.mode_signature or "MANUSCRITE", data.signe_par
-        return await _done(db, f, "SIGN", {"date_signature": on.isoformat(), "mode": f.mode_signature})
+        return await _done(db, f)
 
     return await _hand_over(db, f, data, on)  # etape 5 : le materiel a ete remis
 
@@ -329,7 +326,7 @@ async def set_signature(db: AsyncSession, fiche_id: int, data: SignatureIn) -> d
     actor = await db.get(Utilisateur, actor_id) if actor_id else None
     f.signature_modifiee_par = actor.nom_utilisateur if actor else None
     f.signature_modifiee_le = datetime.now(timezone.utc)
-    return await _done(db, f, "SET_SIGNATURE", {"signee": data.signee, "date_signature": f.date_signature and f.date_signature.isoformat()})
+    return await _done(db, f)
 
 
 async def back(db: AsyncSession, fiche_id: int) -> dict[str, Any]:
@@ -343,12 +340,12 @@ async def back(db: AsyncSession, fiche_id: int) -> dict[str, Any]:
         raise ConflictError("Ce dossier est déjà à la première étape.")
     if step == 2:
         f.valide_par = f.date_validation = None
-        return await _done(db, f, "UNVALIDATE")
+        return await _done(db, f)
     if step == 4:  # on retire l'equipement : il redevient libre pour un autre dossier
         f.materiel_id = f.date_generation = None
-        return await _done(db, f, "UNSELECT_EQUIPMENT")
+        return await _done(db, f)
     f.statut, f.date_signature, f.mode_signature, f.signe_par = "NON_SIGNEE", None, None, None  # etape 5
-    return await _done(db, f, "UNSIGN")
+    return await _done(db, f)
 
 
 async def close(db: AsyncSession, fiche_id: int, motif: str | None) -> dict[str, Any]:
@@ -357,7 +354,7 @@ async def close(db: AsyncSession, fiche_id: int, motif: str | None) -> dict[str,
     _open(f)
     f.cloture = "ANNULEE" if f.valide_par else "REFUSEE"
     f.motif_cloture = motif
-    return await _done(db, f, "CANCEL" if f.valide_par else "REFUSE", {"motif": motif})
+    return await _done(db, f)
 
 
 # ----------------------------- lien avec les affectations -----------------------------
@@ -386,7 +383,6 @@ async def attach_or_create(db: AsyncSession, a: Affectation) -> FicheDetention:
     )
     db.add(fiche)
     await db.flush()
-    await audit_service.record(db, "CREATE", "fiche_detention", fiche.id, {"reference": fiche.reference})
     return fiche
 
 

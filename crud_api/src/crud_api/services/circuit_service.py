@@ -12,7 +12,7 @@ from crud_api.core.deps import Principal
 from crud_api.core.errors import ConflictError, UnprocessableError
 from crud_api.models import Affectation, Agent, CategorieMateriel, FicheDetention, Materiel
 from crud_api.schemas.circuit import TransfertCreate
-from crud_api.services import audit_service, fiche_service
+from crud_api.services import fiche_service
 from crud_api.services.materiel_service import affectation_service
 
 
@@ -66,8 +66,6 @@ async def transfer(db: AsyncSession, p: Principal, data: TransfertCreate) -> Aff
     fiche.besoin = f"Affectation directe : matériel retiré à {ancien_nom}"
     fiche.valide_par = p.user.nom_utilisateur if p.user else "Dépositaire comptable"
     await db.flush()
-    await audit_service.record(db, "TRANSFER", "affectation", nouvelle.id,
-                               {"materiel_id": m.id, "de": ancien_nom, "vers": f"{nouveau.prenom} {nouveau.nom}", "fiche": fiche.reference})
     await db.commit()
     return await affectation_service.get(db, nouvelle.id)
 

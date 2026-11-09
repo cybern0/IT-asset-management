@@ -278,7 +278,6 @@ const A: [string, string, string][] = [
   ["une règle", "a rule", "fitsipika"],
   ["un formulaire", "a form", "taratasy fenoina"],
   ["une notification", "a notification", "fampandrenesana"],
-  ["une entrée de journal", "a log entry", "firaketana ao amin'ny diary"],
   ["une source d’inventaire", "an inventory source", "loharanon'ny fanisana"],
   // --- groupes du menu et descriptions
   ["Réseau et baies", "Network and racks", "Tambajotra sy rack"],
@@ -290,10 +289,7 @@ const A: [string, string, string][] = [
   ["Dictionnaires", "Dictionaries", "Rakibolana"],
   ["Attributions et affectations", "Assignments and allocations", "Fanendrena sy fizarana"],
   ["Dossiers d’attribution du matériel aux agents, puis historique des affectations et retours.", "Equipment assignment files, then the history of assignments and returns.", "Antontan-taratasy fanendrena fitaovana amin'ny mpiasa, avy eo tantaran'ny fanendrena sy fampiverenana."],
-  ["Journal d’audit", "Audit log", "Diary fanaraha-maso"],
-  ["Journal des actions effectuées dans l’application.", "Log of the actions performed in the application.", "Diary ny hetsika natao tao amin'ny rindranasa."],
   ["Automatisation", "Automation", "Fanaovana ho azy"],
-  ["Suivi", "Monitoring", "Fanaraha-maso"],
   ["Matériel individualisé, un onglet par catégorie.", "Individually tracked hardware, one tab per category.", "Fitaovana tsirairay, tabilao iray isaky ny sokajy."],
   ["Équipements réseau, baies, câblage, cartes SIM : même table matériel, une catégorie par onglet.", "Network devices, racks, cabling, SIM cards: same hardware table, one category per tab.", "Fitaovana tambajotra, rack, tariby, karatra SIM: tabilao fitaovana iray ihany, sokajy iray isaky ny tabilao."],
   ["Articles, stocks par service et mouvements d’entrée, sortie et transfert.", "Items, stock per department, and entry, exit and transfer movements.", "Entana, tahiry isaky ny sampana ary fihetsehana fidirana, fivoahana ary famindrana."],
@@ -629,7 +625,6 @@ const A: [string, string, string][] = [
   ["Détenteur actuel", "Current holder", "Mpitazona ankehitriny"],
   ["Enregistré dans le parc", "Added to the inventory", "Voarakitra ao amin'ny fitaovana"],
   ["Fiche de détention signée", "Holding sheet signed", "Voasonia ny taratasy fitazonana"],
-  ["Fiche du matériel modifiée", "Equipment record updated", "Novaina ny taratasin'ny fitaovana"],
   ["Fiche signée par le chef de service", "Sheet signed by the head of department", "Voasonian'ny lehiben'ny sampana ny taratasy"],
   ["Fiche signée par l’agent", "Sheet signed by the agent", "Voasonian'ny mpiasa ny taratasy"],
   ["Marque / modèle", "Brand / model", "Marika / môdely"],
@@ -722,7 +717,6 @@ const B: [string, string, string][] = [
   ["Rules", "Règles", "Fitsipika"],
   ["Forms", "Formulaires", "Taratasy fenoina"],
   ["Notification queue", "File de notifications", "Laharan'ny fampandrenesana"],
-  ["Logs", "Journal d’audit", "Diary fanaraha-maso"],
   ["Inventory", "Inventaire", "Fanisana entana"],
 ];
 
@@ -785,4 +779,3 @@ for (const [fr, en, mg] of C) { A.push([fr, en, mg]); }
 export const dict: Record<Lang, Record<string, string>> = { fr: {}, en: {}, mg: {} };
 for (const [fr, en, mg] of A) { dict.en[fr] = en; dict.mg[fr] = mg; }
 for (const [en, fr, mg] of B) { dict.fr[en] = fr; dict.mg[en] = mg; }
-dict.en["Logs"] = "Audit log";

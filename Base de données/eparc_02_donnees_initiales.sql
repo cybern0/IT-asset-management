@@ -35,7 +35,6 @@ INSERT INTO permission(code, libelle) VALUES
  ('reception.approuver',       'Approuver la réception du matériel'),
  ('notification.envoyer',      'Envoyer les notifications (mail, SMS, WhatsApp)'),
  ('acces.gerer',               'Gérer les comptes, les rôles et les droits'),
- ('audit.lire',                'Consulter le journal d''audit'),
  ('affectation.transferer',    'Retirer un matériel à son détenteur et l''affecter à un autre agent')
 ON CONFLICT (code) DO UPDATE SET libelle = EXCLUDED.libelle;
 

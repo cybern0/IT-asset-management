@@ -226,7 +226,6 @@ function Event({ e }: { e: Ev }) {
     RECEPTION: t("Réception approuvée"),
     REFUS: t("Demande refusée"),
     ANNULATION: t("Demande annulée"),
-    MODIFICATION: t("Fiche du matériel modifiée"),
   };
   // ligne de détail : seules les informations présentes sont affichées
   const sub = [

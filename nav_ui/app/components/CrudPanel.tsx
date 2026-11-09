@@ -140,7 +140,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
           const form = new FormData();
           form.append("file", pendingImage);
           await api.upload(`/materiels/${row.id}/image`, form);
-          await refresh(["materiel", "journal_audit"]);
+          await refresh(["materiel"]);
           saved = { ...row, a_image: "true" };
         } catch (imgErr) {
           reset(row.id, draftFrom(row), message);
@@ -382,7 +382,7 @@ export function CrudPanel({ entity }: { entity: Entity }) {
           hasImage={hasImage}
           onClose={() => setImageOpen(false)}
           onChanged={async () => {
-            await refresh(["materiel", "journal_audit"]);
+            await refresh(["materiel"]);
           }}
         />
       )}
