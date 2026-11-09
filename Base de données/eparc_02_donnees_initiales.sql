@@ -4,7 +4,7 @@
 --   - role : ADMIN uniquement
 --   - permissions : toutes les permissions de l'application, toutes accordees a ADMIN
 --   - categories de materiel, avec le menu de l'interface sous lequel elles apparaissent
--- Aucun utilisateur n'est cree ici.
+-- Un compte administrateur par defaut (admin) est cree pour la premiere connexion.
 -- =====================================================================================================================
 
 -- Encodage : le script est en UTF-8, quel que soit le reglage par defaut du client (psql sous Windows = WIN1252)
@@ -62,3 +62,13 @@ INSERT INTO categorie_materiel(code, libelle, category_menu) VALUES
  ('CABLE',        'Câble',               'Réseau'),
  ('SIM',          'Carte SIM',           'Réseau')
 ON CONFLICT (code) DO UPDATE SET libelle = EXCLUDED.libelle, category_menu = EXCLUDED.category_menu;
+
+-- 5) Compte administrateur par defaut (premiere connexion) -----------------------------------------------------
+-- Identifiant : admin   Mot de passe : Admin@eparc2026   (hash argon2id, meme format que l'API)
+-- A CHANGER des la premiere connexion (page Profil). N'est cree que si le compte n'existe pas : rejouable sans risque,
+-- et le mot de passe d'un compte existant n'est jamais ecrase.
+INSERT INTO utilisateur(nom_utilisateur, mot_de_passe_hash, role_id, actif)
+SELECT 'admin', '$argon2id$v=19$m=65536,t=3,p=4$eDdLcDJtUXc5UnRMejRWYg$56V0MXG74UBrBBEIkCXc2jLHy3mq915ypimQSBrFKZ4', r.id, TRUE
+FROM role r
+WHERE r.code = 'ADMIN'
+ON CONFLICT (nom_utilisateur) DO NOTHING;
