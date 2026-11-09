@@ -37,7 +37,7 @@ les erreurs de validation Pydantic gardent le format FastAPI standard.
 ## Authentification et autorisation
 
 Activees par `AUTH_ENABLED=true` (valeur de `.env.example`) : definir `JWT_SECRET` et, au premier demarrage,
-`BOOTSTRAP_ADMIN_PASSWORD` pour creer le compte `admin`. Avec `AUTH_ENABLED=false`, l'API reste ouverte.
+`BOOTSTRAP_ADMIN_PASSWORD` pour creer le compte `admin`. Le script `eparc_02_donnees_initiales.sql` cree aussi un compte `admin` (mot de passe initial `Admin@eparc2026`, a changer des la premiere connexion). Avec `AUTH_ENABLED=false`, l'API reste ouverte.
 `POST /api/v1/auth/login` renvoie un jeton (a envoyer en `Authorization: Bearer ...`) et l'utilisateur avec son
 `role_code` ; `GET /auth/me` renvoie l'utilisateur courant.
 

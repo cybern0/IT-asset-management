@@ -516,3 +516,7 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 .tl-date { font-size: 12px; color: var(--muted); }
 .tl-title { font-weight: 700; }
 .tl-sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+
+/* en-tete de colonne triable (Global > Détentions) */
+.th-sort { all: unset; cursor: pointer; font: inherit; color: inherit; font-weight: inherit; white-space: nowrap; }
+.th-sort:hover, .th-sort:focus-visible { text-decoration: underline; }

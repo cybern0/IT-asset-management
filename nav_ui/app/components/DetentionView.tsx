@@ -24,6 +24,7 @@ export function DetentionView() {
   const [fiche, setFiche] = useState("");
   const [etat, setEtat] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
+  const [recentFirst, setRecentFirst] = useState(true); // tri par date de remise : plus recent en premier par defaut
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,7 +39,10 @@ export function DetentionView() {
   const visible = useMemo(() => {
     const a = norm(qAgent.trim());
     const m = norm(qMat.trim());
-    return items.filter((d) => {
+    const dateOf = (d: Detention) => d.date_remise ?? d.date_demande ?? "";
+    const sign = recentFirst ? -1 : 1;
+    const sorted = [...items].sort((x, y) => sign * (dateOf(x).localeCompare(dateOf(y)) || x.id - y.id));
+    return sorted.filter((d) => {
       if (d.materiel_id === null || d.cloture) return false;
       if (a && !norm(`${d.agent_nom} ${d.agent_prenom} ${d.agent_prenom} ${d.agent_nom} ${d.agent_matricule}`).includes(a)) return false;
       if (m && !norm(`${d.materiel_designation} ${d.materiel_code} ${d.materiel_marque ?? ""} ${d.materiel_modele ?? ""} ${d.materiel_serie ?? ""}`).includes(m)) return false;
@@ -46,7 +50,7 @@ export function DetentionView() {
       if (etat && d.etat !== etat) return false;
       return true;
     });
-  }, [items, qAgent, qMat, fiche, etat]);
+  }, [items, qAgent, qMat, fiche, etat, recentFirst]);
 
   const current = items.find((d) => d.id === openId) ?? null;
 
@@ -89,7 +93,11 @@ export function DetentionView() {
             <thead>
               <tr>
                 <th>{t("Matériel")}</th><th>{t("Agent détenteur")}</th><th>{t("Service")}</th>
-                <th>{t("Remise")}</th><th>{t("Détention")}</th><th>{t("Fiche")}</th><th />
+                <th aria-sort={recentFirst ? "descending" : "ascending"}>
+                  <button type="button" className="th-sort" onClick={() => setRecentFirst((v) => !v)}>
+                    {t("Remise")} {recentFirst ? "▼" : "▲"}
+                  </button>
+                </th><th>{t("Détention")}</th><th>{t("Fiche")}</th><th />
               </tr>
             </thead>
             <tbody>
